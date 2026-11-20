@@ -10,7 +10,10 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel dev",
+    "dev:desktop": "pnpm --filter @codemind/desktop dev",
     "build": "pnpm -r build",
+    "build:desktop": "pnpm --filter @codemind/desktop build",
+    "package:desktop": "pnpm --filter @codemind/desktop package",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "pnpm -r typecheck",

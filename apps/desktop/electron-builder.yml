@@ -1,0 +1,32 @@
+appId: com.codemind.ide
+productName: CodeMind
+copyright: Copyright © 2026 CodeMind
+directories:
+  output: release
+  buildResources: build-resources
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+linux:
+  category: Development
+  target:
+    - AppImage
+    - deb
+  artifactName: "${productName}-${version}-${arch}.${ext}"

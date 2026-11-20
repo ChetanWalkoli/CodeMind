@@ -2,6 +2,7 @@ node_modules
 dist
 dist-electron
 build
+release
 coverage
 pnpm-lock.yaml
 prisma/migrations

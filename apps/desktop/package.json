@@ -3,15 +3,47 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "echo \"Desktop dev server will be wired in Phase 1\"",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\""
+    "dev": "concurrently -k -n vite,electron \"pnpm run dev:renderer\" \"pnpm run dev:electron\"",
+    "dev:renderer": "vite --port 5173 --strictPort",
+    "dev:electron": "pnpm run build:electron && wait-on http://localhost:5173 && node scripts/launch-electron.mjs --dev-url http://localhost:5173 .",
+    "build": "pnpm run build:renderer && pnpm run build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "start": "node scripts/launch-electron.mjs .",
+    "package": "pnpm run build && electron-builder --config electron-builder.yml --dir",
+    "package:win": "pnpm run build && electron-builder --config electron-builder.yml --win",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('dist-electron',{recursive:true,force:true}); fs.rmSync('release',{recursive:true,force:true});\""
   },
   "dependencies": {
     "@codemind/config": "workspace:*",
-    "@codemind/shared": "workspace:*"
+    "@codemind/shared": "workspace:*",
+    "@monaco-editor/react": "^4.7.0",
+    "lucide-react": "^0.483.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.2",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^45.4.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.1",
+    "jsdom": "^26.0.0",
+    "sass": "^1.86.0",
+    "vite": "^6.2.2",
+    "wait-on": "^8.0.3"
   }
 }

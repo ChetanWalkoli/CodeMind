@@ -10,6 +10,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/dist-electron/**",
       "**/build/**",
+      "**/release/**",
       "**/coverage/**",
       "**/.vite/**",
       "prisma/migrations/**"

@@ -1,0 +1,24 @@
+.handle {
+  flex-shrink: 0;
+  background-color: transparent;
+  transition: background-color var(--transition-fast);
+  position: relative;
+  z-index: 5;
+
+  &:hover,
+  &[data-dragging="true"] {
+    background-color: var(--accent);
+  }
+}
+
+.vertical {
+  width: 4px;
+  cursor: col-resize;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.horizontal {
+  height: 4px;
+  cursor: row-resize;
+  border-top: 1px solid var(--border-subtle);
+}
