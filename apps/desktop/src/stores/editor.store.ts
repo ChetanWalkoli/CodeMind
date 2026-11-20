@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SAMPLE_DOCUMENTS } from "../data/sampleDocuments";
+import { desktopApi } from "../services/desktopApi";
 import { detectEditorLanguage, type EditorLanguageId } from "../utils/languageDetection";
 
 export interface EditorTab {
@@ -11,6 +12,14 @@ export interface EditorTab {
   languageLabel: string;
   isDirty: boolean;
   isInMemory: boolean;
+  workspaceRoot?: string;
+  relativePath?: string;
+  contentHash?: string;
+  isSecret?: boolean;
+  isSaving?: boolean;
+  lastSavedAt?: number;
+  externalConflict?: boolean;
+  saveError?: string | null;
 }
 
 export interface CursorPosition {
@@ -29,18 +38,29 @@ interface EditorState {
   tabs: EditorTab[];
   activeTabId: string | null;
   pendingCloseTabId: string | null;
+  conflictTabId: string | null;
   cursor: CursorPosition;
   settings: EditorSettings;
   scratchCounter: number;
 
   openTab: (doc: { id: string; title: string; content: string; isInMemory?: boolean }) => void;
+  openWorkspaceFile: (
+    workspaceRoot: string,
+    relativePath: string
+  ) => Promise<{ ok: boolean; error?: string }>;
   createScratchTab: (extension?: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTabContent: (tabId: string, content: string) => void;
+  saveTab: (tabId: string, force?: boolean) => Promise<boolean>;
+  saveActiveTab: (force?: boolean) => Promise<boolean>;
+  reloadTabFromDisk: (tabId: string) => Promise<boolean>;
+  dismissConflict: (tabId: string) => void;
+  checkActiveTabExternalChanges: () => Promise<void>;
   requestCloseTab: (tabId: string) => void;
   cancelPendingClose: () => void;
   confirmPendingClose: () => void;
   closeTabForce: (tabId: string) => void;
+  clearWorkspaceTabs: () => void;
   setCursor: (cursor: CursorPosition) => void;
   toggleMinimap: () => void;
   toggleWordWrap: () => void;
@@ -54,6 +74,10 @@ function buildTab(doc: {
   title: string;
   content: string;
   isInMemory?: boolean;
+  workspaceRoot?: string;
+  relativePath?: string;
+  contentHash?: string;
+  isSecret?: boolean;
 }): EditorTab {
   const detected = detectEditorLanguage(doc.title);
   return {
@@ -64,8 +88,19 @@ function buildTab(doc: {
     language: detected.monacoId,
     languageLabel: detected.label,
     isDirty: false,
-    isInMemory: doc.isInMemory ?? true
+    isInMemory: doc.isInMemory ?? true,
+    workspaceRoot: doc.workspaceRoot,
+    relativePath: doc.relativePath,
+    contentHash: doc.contentHash,
+    isSecret: doc.isSecret,
+    isSaving: false,
+    externalConflict: false,
+    saveError: null
   };
+}
+
+function makeWorkspaceTabId(workspaceRoot: string, relativePath: string): string {
+  return `file::${workspaceRoot}::${relativePath}`;
 }
 
 function createInitialTabs(): EditorTab[] {
@@ -78,6 +113,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? null,
   pendingCloseTabId: null,
+  conflictTabId: null,
   cursor: { line: 1, column: 1 },
   settings: {
     minimap: true,
@@ -100,6 +136,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeTabId: nextTab.id,
       cursor: { line: 1, column: 1 }
     }));
+  },
+
+  async openWorkspaceFile(workspaceRoot, relativePath) {
+    const normalizedRel = relativePath.replace(/\\/g, "/");
+    const tabId = makeWorkspaceTabId(workspaceRoot, normalizedRel);
+    const existing = get().tabs.find((t) => t.id === tabId);
+    if (existing) {
+      set({ activeTabId: existing.id });
+      return { ok: true };
+    }
+
+    const response = await desktopApi.readFile({
+      workspaceRoot,
+      relativePath: normalizedRel
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: response.error.message };
+    }
+
+    const title = normalizedRel.split("/").pop() ?? normalizedRel;
+    const nextTab = buildTab({
+      id: tabId,
+      title,
+      content: response.data.content,
+      isInMemory: false,
+      workspaceRoot,
+      relativePath: response.data.relativePath,
+      contentHash: response.data.contentHash,
+      isSecret: response.data.isSecret
+    });
+
+    set((state) => ({
+      tabs: [...state.tabs, nextTab],
+      activeTabId: nextTab.id,
+      cursor: { line: 1, column: 1 }
+    }));
+
+    return { ok: true };
   },
 
   createScratchTab(extension = ".ts") {
@@ -135,10 +210,159 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...tab,
           content,
-          isDirty: content !== tab.originalContent
+          isDirty: content !== tab.originalContent,
+          saveError: null
         };
       })
     }));
+  },
+
+  async saveTab(tabId, force = false) {
+    const target = get().tabs.find((t) => t.id === tabId);
+    if (!target || target.isInMemory || !target.workspaceRoot || !target.relativePath) {
+      return false;
+    }
+
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, isSaving: true, saveError: null } : t))
+    }));
+
+    const response = await desktopApi.writeFile({
+      workspaceRoot: target.workspaceRoot,
+      relativePath: target.relativePath,
+      content: target.content,
+      expectedContentHash: target.contentHash,
+      force
+    });
+
+    if (!response.ok) {
+      const isConflict = response.error.code === "EXTERNAL_MODIFICATION_CONFLICT";
+      set((state) => ({
+        conflictTabId: isConflict ? tabId : state.conflictTabId,
+        tabs: state.tabs.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                isSaving: false,
+                externalConflict: isConflict || t.externalConflict,
+                saveError: response.error.message
+              }
+            : t
+        )
+      }));
+      return false;
+    }
+
+    set((state) => ({
+      conflictTabId: state.conflictTabId === tabId ? null : state.conflictTabId,
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              originalContent: t.content,
+              contentHash: response.data.contentHash,
+              isDirty: false,
+              isSaving: false,
+              lastSavedAt: Date.now(),
+              externalConflict: false,
+              saveError: null
+            }
+          : t
+      )
+    }));
+
+    return true;
+  },
+
+  async saveActiveTab(force = false) {
+    const activeId = get().activeTabId;
+    if (!activeId) return false;
+    return get().saveTab(activeId, force);
+  },
+
+  async reloadTabFromDisk(tabId) {
+    const target = get().tabs.find((t) => t.id === tabId);
+    if (!target || target.isInMemory || !target.workspaceRoot || !target.relativePath) {
+      return false;
+    }
+
+    const response = await desktopApi.readFile({
+      workspaceRoot: target.workspaceRoot,
+      relativePath: target.relativePath
+    });
+
+    if (!response.ok) {
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === tabId ? { ...t, saveError: response.error.message } : t
+        )
+      }));
+      return false;
+    }
+
+    set((state) => ({
+      conflictTabId: state.conflictTabId === tabId ? null : state.conflictTabId,
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              content: response.data.content,
+              originalContent: response.data.content,
+              contentHash: response.data.contentHash,
+              isDirty: false,
+              externalConflict: false,
+              saveError: null
+            }
+          : t
+      )
+    }));
+
+    return true;
+  },
+
+  dismissConflict(tabId) {
+    set((state) => ({
+      conflictTabId: state.conflictTabId === tabId ? null : state.conflictTabId,
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, externalConflict: false } : t))
+    }));
+  },
+
+  async checkActiveTabExternalChanges() {
+    const activeId = get().activeTabId;
+    if (!activeId) return;
+    const activeTab = get().tabs.find((t) => t.id === activeId);
+    if (
+      !activeTab ||
+      activeTab.isInMemory ||
+      !activeTab.workspaceRoot ||
+      !activeTab.relativePath ||
+      !activeTab.contentHash
+    ) {
+      return;
+    }
+
+    const statRes = await desktopApi.statFile({
+      workspaceRoot: activeTab.workspaceRoot,
+      relativePath: activeTab.relativePath
+    });
+
+    if (!statRes.ok || !statRes.data.exists || !statRes.data.contentHash) {
+      return;
+    }
+
+    if (statRes.data.contentHash !== activeTab.contentHash) {
+      if (!activeTab.isDirty) {
+        // Safe auto-reload only when there are no unsaved local edits.
+        await get().reloadTabFromDisk(activeTab.id);
+      } else {
+        set((state) => ({
+          conflictTabId: activeTab.id,
+          tabs: state.tabs.map((t) =>
+            t.id === activeTab.id ? { ...t, externalConflict: true } : t
+          )
+        }));
+      }
+    }
   },
 
   requestCloseTab(tabId) {
@@ -181,8 +405,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         tabs: nextTabs,
         activeTabId: nextActiveId,
         pendingCloseTabId: state.pendingCloseTabId === tabId ? null : state.pendingCloseTabId,
+        conflictTabId: state.conflictTabId === tabId ? null : state.conflictTabId,
         cursor: { line: 1, column: 1 }
       };
+    });
+  },
+
+  clearWorkspaceTabs() {
+    set({
+      tabs: [],
+      activeTabId: null,
+      pendingCloseTabId: null,
+      conflictTabId: null,
+      cursor: { line: 1, column: 1 }
     });
   },
 
@@ -224,6 +459,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tabs: fresh,
       activeTabId: fresh[0]?.id ?? null,
       pendingCloseTabId: null,
+      conflictTabId: null,
       cursor: { line: 1, column: 1 },
       scratchCounter: 1
     });

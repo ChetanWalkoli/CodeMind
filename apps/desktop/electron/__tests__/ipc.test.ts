@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "@codemind/shared";
-import { APPROVED_PHASE1_CHANNELS, isApprovedPhase1Channel } from "../ipc/channels.js";
+import { APPROVED_IPC_CHANNELS, isApprovedIpcChannel } from "../ipc/channels.js";
 import {
   getRegisteredIpcChannels,
   registerIpcHandlers,
@@ -25,7 +25,7 @@ class MockIpcMain implements IpcMainLike {
     this.handlers.delete(channel);
   }
 
-  invoke(channel: string, payload?: unknown): unknown {
+  async invoke(channel: string, payload?: unknown): Promise<unknown> {
     const handler = this.handlers.get(channel);
     if (!handler) {
       throw new Error(`No handler registered for channel: ${channel}`);
@@ -50,9 +50,9 @@ describe("Electron main security & IPC foundation", () => {
         version: "0.1.0",
         platform: "win32",
         arch: "x64",
-        electronVersion: "35.0.2",
-        nodeVersion: "22.0.0",
-        chromeVersion: "134.0.0"
+        electronVersion: "45.4.1",
+        nodeVersion: "24.22.3",
+        chromeVersion: "156.0.0"
       },
       preferences
     });
@@ -77,15 +77,14 @@ describe("Electron main security & IPC foundation", () => {
     expect(options.webPreferences?.webSecurity).toBe(true);
   });
 
-  it("registers only explicitly approved Phase 1 IPC channels (no fs or shell)", () => {
+  it("registers only explicitly approved IPC channels and rejects unknown/shell channels", () => {
     const registered = getRegisteredIpcChannels();
-    expect(registered).toEqual(expect.arrayContaining([...APPROVED_PHASE1_CHANNELS]));
-    expect(registered).toHaveLength(APPROVED_PHASE1_CHANNELS.length);
+    expect(registered).toEqual(expect.arrayContaining([...APPROVED_IPC_CHANNELS]));
+    expect(registered).toHaveLength(APPROVED_IPC_CHANNELS.length);
 
-    expect(isApprovedPhase1Channel(IPC_CHANNELS.FILE_READ)).toBe(false);
-    expect(isApprovedPhase1Channel(IPC_CHANNELS.FILE_WRITE)).toBe(false);
-    expect(ipcMain.handlers.has(IPC_CHANNELS.FILE_READ)).toBe(false);
-    expect(ipcMain.handlers.has(IPC_CHANNELS.FILE_WRITE)).toBe(false);
+    expect(isApprovedIpcChannel("shell:exec")).toBe(false);
+    expect(isApprovedIpcChannel("fs:delete-any")).toBe(false);
+    expect(ipcMain.handlers.has("shell:exec")).toBe(false);
   });
 
   it("prevents duplicate IPC handler registration", () => {
@@ -96,31 +95,31 @@ describe("Electron main security & IPC foundation", () => {
         version: "0.1.0",
         platform: "win32",
         arch: "x64",
-        electronVersion: "35.0.2",
-        nodeVersion: "22.0.0",
-        chromeVersion: "134.0.0"
+        electronVersion: "45.4.1",
+        nodeVersion: "24.22.3",
+        chromeVersion: "156.0.0"
       },
       preferences
     });
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("returns validated app info, platform info, and health check", () => {
-    const appRes = ipcMain.invoke(IPC_CHANNELS.APP_GET_INFO) as {
+  it("returns validated app info, platform info, and health check", async () => {
+    const appRes = (await ipcMain.invoke(IPC_CHANNELS.APP_GET_INFO)) as {
       ok: boolean;
       data: { name: string };
     };
     expect(appRes.ok).toBe(true);
     expect(appRes.data.name).toBe("CodeMind");
 
-    const platRes = ipcMain.invoke(IPC_CHANNELS.APP_GET_PLATFORM) as {
+    const platRes = (await ipcMain.invoke(IPC_CHANNELS.APP_GET_PLATFORM)) as {
       ok: boolean;
       data: { arch: string };
     };
     expect(platRes.ok).toBe(true);
     expect(platRes.data.arch).toBe("x64");
 
-    const healthRes = ipcMain.invoke(IPC_CHANNELS.APP_HEALTH_CHECK) as {
+    const healthRes = (await ipcMain.invoke(IPC_CHANNELS.APP_HEALTH_CHECK)) as {
       ok: boolean;
       data: { status: string };
     };
@@ -128,24 +127,23 @@ describe("Electron main security & IPC foundation", () => {
     expect(healthRes.data.status).toBe("ready");
   });
 
-  it("persists theme preferences across PreferencesStore instances and rejects invalid payloads", () => {
-    const initial = ipcMain.invoke(IPC_CHANNELS.THEME_GET) as { ok: boolean; data: string };
+  it("persists theme preferences across PreferencesStore instances and rejects invalid payloads", async () => {
+    const initial = (await ipcMain.invoke(IPC_CHANNELS.THEME_GET)) as { ok: boolean; data: string };
     expect(initial).toEqual({ ok: true, data: "dark" });
 
-    const invalid = ipcMain.invoke(IPC_CHANNELS.THEME_SET, { theme: "neon-purple" }) as {
+    const invalid = (await ipcMain.invoke(IPC_CHANNELS.THEME_SET, { theme: "neon-purple" })) as {
       ok: boolean;
       error: { code: string };
     };
     expect(invalid.ok).toBe(false);
     expect(invalid.error.code).toBe("INVALID_PAYLOAD");
 
-    const updated = ipcMain.invoke(IPC_CHANNELS.THEME_SET, { theme: "light" }) as {
+    const updated = (await ipcMain.invoke(IPC_CHANNELS.THEME_SET, { theme: "light" })) as {
       ok: boolean;
       data: string;
     };
     expect(updated).toEqual({ ok: true, data: "light" });
 
-    // Simulate application restart with a fresh PreferencesStore pointing to same directory
     const reloadedStore = new PreferencesStore(tempDir);
     expect(reloadedStore.getTheme()).toBe("light");
   });

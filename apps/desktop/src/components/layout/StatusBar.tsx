@@ -1,3 +1,4 @@
+import { GitBranch } from "lucide-react";
 import { useEditorStore } from "../../stores/editor.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
 import styles from "./StatusBar.module.scss";
@@ -10,6 +11,7 @@ export function StatusBar() {
 
   const isElectron = useWorkspaceStore((s) => s.isElectron);
   const bridgeStatus = useWorkspaceStore((s) => s.bridgeStatus);
+  const gitStatus = useWorkspaceStore((s) => s.gitStatus);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
 
@@ -33,9 +35,27 @@ export function StatusBar() {
           {readinessLabel}
         </span>
 
+        {gitStatus?.isGitRepo && (
+          <span
+            className={styles.item}
+            data-testid="status-git"
+            title={
+              gitStatus.isDirty
+                ? `${gitStatus.modifiedCount} modified path(s) in working tree`
+                : "Working tree clean"
+            }
+          >
+            <GitBranch size={12} aria-hidden="true" />
+            <span>
+              {gitStatus.branch ?? "HEAD"} ·{" "}
+              {gitStatus.isDirty ? `Modified (${gitStatus.modifiedCount})` : "Clean"}
+            </span>
+          </span>
+        )}
+
         <span className={styles.item} data-testid="status-file">
           {activeTab
-            ? `${activeTab.title}${activeTab.isDirty ? " (Modified)" : ""}`
+            ? `${activeTab.title}${activeTab.isSaving ? " (Saving...)" : activeTab.isDirty ? " (Modified)" : ""}`
             : "No file open"}
         </span>
       </div>

@@ -1,6 +1,7 @@
 import { BrainCircuit, Moon, PanelBottom, PanelLeft, PanelRight, Sun } from "lucide-react";
 import { useLayoutStore } from "../../stores/layout.store";
 import { useThemeStore } from "../../stores/theme.store";
+import { useWorkspaceStore } from "../../stores/workspace.store";
 import styles from "./TitleBar.module.scss";
 
 export function TitleBar() {
@@ -10,6 +11,8 @@ export function TitleBar() {
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const toggleRightPanel = useLayoutStore((s) => s.toggleRightPanel);
   const toggleBottomPanel = useLayoutStore((s) => s.toggleBottomPanel);
+
+  const workspace = useWorkspaceStore((s) => s.workspace);
 
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
@@ -21,7 +24,9 @@ export function TitleBar() {
           <BrainCircuit size={14} />
         </span>
         <span className={styles.brandName}>CodeMind</span>
-        <span className={styles.tagline}>Understand. Improve. Remember.</span>
+        <span className={styles.tagline} title={workspace?.rootPath}>
+          {workspace ? workspace.name : "Understand. Improve. Remember."}
+        </span>
       </div>
 
       <div className={styles.actions}>

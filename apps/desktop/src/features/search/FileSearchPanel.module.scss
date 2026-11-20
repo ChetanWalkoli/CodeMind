@@ -1,0 +1,86 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px 0 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 12px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.emptyCard {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resultItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.resultName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultPath {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

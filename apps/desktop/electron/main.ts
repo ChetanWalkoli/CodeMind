@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
 import { APP_CONSTANTS } from "@codemind/config";
 import { registerIpcHandlers, unregisterIpcHandlers } from "./ipc/index.js";
 import { PreferencesStore } from "./utils/preferences.js";
 import { createMainWindow } from "./window.js";
+import { WorkspaceFileService } from "./workspace/filesystem.js";
+import { WorkspaceAuthority } from "./workspace/pathSecurity.js";
 
 const disableGpu = process.env.CODEMIND_DISABLE_GPU === "1";
 if (disableGpu) {
@@ -16,6 +18,8 @@ if (disableGpu) {
 
 let mainWindow: BrowserWindow | null = null;
 let preferencesStore: PreferencesStore | null = null;
+const workspaceAuthority = new WorkspaceAuthority();
+const workspaceFileService = new WorkspaceFileService(workspaceAuthority);
 
 function getPreferencesStore(): PreferencesStore {
   if (!preferencesStore) {
@@ -30,6 +34,23 @@ function getPreloadPath(): string {
 
 function getRendererDistPath(): string {
   return path.resolve(__dirname, "../dist");
+}
+
+async function selectWorkspaceFolderDialog(): Promise<string | null> {
+  const options: Electron.OpenDialogOptions = {
+    title: "Open Project Folder",
+    properties: ["openDirectory"]
+  };
+
+  const result = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0] ?? null;
 }
 
 function createWindow(): void {
@@ -72,7 +93,10 @@ app
         nodeVersion: process.versions.node ?? "unknown",
         chromeVersion: process.versions.chrome ?? "unknown"
       },
-      preferences
+      preferences,
+      authority: workspaceAuthority,
+      fileService: workspaceFileService,
+      selectFolder: selectWorkspaceFolderDialog
     });
 
     createWindow();

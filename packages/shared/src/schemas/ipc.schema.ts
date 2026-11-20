@@ -2,9 +2,15 @@ import { z } from "zod";
 
 export const IPC_CHANNELS = {
   WORKSPACE_SELECT_FOLDER: "workspace:select-folder",
+  WORKSPACE_OPEN: "workspace:open",
+  WORKSPACE_GET_LAST: "workspace:get-last",
+  WORKSPACE_SAVE_SESSION: "workspace:save-session",
   WORKSPACE_GET_TREE: "workspace:get-tree",
+  WORKSPACE_SEARCH_FILES: "workspace:search-files",
+  WORKSPACE_GET_GIT_STATUS: "workspace:get-git-status",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
+  FILE_STAT: "file:stat",
   APP_GET_INFO: "app:get-info",
   APP_GET_PLATFORM: "app:get-platform",
   APP_HEALTH_CHECK: "app:health-check",
@@ -21,14 +27,148 @@ export const FileReadRequestSchema = z.object({
 
 export type FileReadRequest = z.infer<typeof FileReadRequestSchema>;
 
+export const FileReadResultSchema = z.object({
+  relativePath: z.string().min(1),
+  content: z.string(),
+  contentHash: z.string().min(1),
+  modifiedAtMs: z.number().nonnegative(),
+  sizeBytes: z.number().int().nonnegative(),
+  isSecret: z.boolean()
+});
+
+export type FileReadResult = z.infer<typeof FileReadResultSchema>;
+
 export const FileWriteRequestSchema = z.object({
   workspaceRoot: z.string().min(1),
   relativePath: z.string().min(1),
   content: z.string(),
-  expectedContentHash: z.string().min(1).optional()
+  expectedContentHash: z.string().min(1).optional(),
+  force: z.boolean().optional()
 });
 
 export type FileWriteRequest = z.infer<typeof FileWriteRequestSchema>;
+
+export const FileWriteResultSchema = z.object({
+  relativePath: z.string().min(1),
+  contentHash: z.string().min(1),
+  modifiedAtMs: z.number().nonnegative(),
+  sizeBytes: z.number().int().nonnegative()
+});
+
+export type FileWriteResult = z.infer<typeof FileWriteResultSchema>;
+
+export const FileStatRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  relativePath: z.string().min(1)
+});
+
+export type FileStatRequest = z.infer<typeof FileStatRequestSchema>;
+
+export const FileStatResultSchema = z.object({
+  exists: z.boolean(),
+  contentHash: z.string().optional(),
+  modifiedAtMs: z.number().nonnegative().optional()
+});
+
+export type FileStatResult = z.infer<typeof FileStatResultSchema>;
+
+export const WorkspaceInfoSchema = z.object({
+  rootPath: z.string().min(1),
+  name: z.string().min(1)
+});
+
+export type WorkspaceInfo = z.infer<typeof WorkspaceInfoSchema>;
+
+export const WorkspaceOpenRequestSchema = z.object({
+  rootPath: z.string().min(1)
+});
+
+export type WorkspaceOpenRequest = z.infer<typeof WorkspaceOpenRequestSchema>;
+
+export const FileTreeNodeSchema: z.ZodType<FileTreeNode> = z.lazy(() =>
+  z.object({
+    name: z.string().min(1),
+    relativePath: z.string().min(1),
+    kind: z.enum(["file", "directory"]),
+    extension: z.string().optional(),
+    isSecret: z.boolean().optional(),
+    unreadable: z.boolean().optional(),
+    hasChildren: z.boolean().optional(),
+    children: z.array(FileTreeNodeSchema).optional()
+  })
+);
+
+export interface FileTreeNode {
+  name: string;
+  relativePath: string;
+  kind: "file" | "directory";
+  extension?: string;
+  isSecret?: boolean;
+  unreadable?: boolean;
+  hasChildren?: boolean;
+  children?: FileTreeNode[];
+}
+
+export const WorkspaceTreeRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  relativeDir: z.string().optional(),
+  customExcludes: z.array(z.string()).optional()
+});
+
+export type WorkspaceTreeRequest = z.infer<typeof WorkspaceTreeRequestSchema>;
+
+export const WorkspaceSearchRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  query: z.string().min(1),
+  maxResults: z.number().int().positive().max(200).optional(),
+  customExcludes: z.array(z.string()).optional()
+});
+
+export type WorkspaceSearchRequest = z.infer<typeof WorkspaceSearchRequestSchema>;
+
+export const FileSearchMatchSchema = z.object({
+  name: z.string().min(1),
+  relativePath: z.string().min(1),
+  extension: z.string().optional()
+});
+
+export type FileSearchMatch = z.infer<typeof FileSearchMatchSchema>;
+
+export const GitStatusRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+
+export type GitStatusRequest = z.infer<typeof GitStatusRequestSchema>;
+
+export const GitStatusSchema = z.object({
+  isGitRepo: z.boolean(),
+  branch: z.string().nullable(),
+  isDirty: z.boolean(),
+  modifiedCount: z.number().int().nonnegative()
+});
+
+export type GitStatus = z.infer<typeof GitStatusSchema>;
+
+export const PersistedLayoutSchema = z.object({
+  sidebarWidth: z.number().int().positive(),
+  rightPanelWidth: z.number().int().positive(),
+  bottomPanelHeight: z.number().int().positive(),
+  sidebarVisible: z.boolean(),
+  rightPanelVisible: z.boolean(),
+  bottomPanelVisible: z.boolean()
+});
+
+export type PersistedLayout = z.infer<typeof PersistedLayoutSchema>;
+
+export const WorkspaceSessionSchema = z.object({
+  lastWorkspacePath: z.string().nullable().default(null),
+  openTabPaths: z.array(z.string()).default([]),
+  activeTabPath: z.string().nullable().default(null),
+  customExcludes: z.array(z.string()).default([]),
+  layout: PersistedLayoutSchema.optional()
+});
+
+export type WorkspaceSession = z.infer<typeof WorkspaceSessionSchema>;
 
 export const AppInfoSchema = z.object({
   name: z.string().min(1),
@@ -79,4 +219,14 @@ export interface CodeMindDesktopAPI {
   healthCheck(): Promise<IpcResponse<HealthCheckResponse>>;
   getTheme(): Promise<IpcResponse<ThemePreference>>;
   setTheme(request: SetThemeRequest): Promise<IpcResponse<ThemePreference>>;
+  selectWorkspaceFolder(): Promise<IpcResponse<WorkspaceInfo | null>>;
+  openWorkspace(request: WorkspaceOpenRequest): Promise<IpcResponse<WorkspaceInfo>>;
+  getWorkspaceSession(): Promise<IpcResponse<WorkspaceSession>>;
+  saveWorkspaceSession(session: WorkspaceSession): Promise<IpcResponse<WorkspaceSession>>;
+  getWorkspaceTree(request: WorkspaceTreeRequest): Promise<IpcResponse<FileTreeNode[]>>;
+  searchWorkspaceFiles(request: WorkspaceSearchRequest): Promise<IpcResponse<FileSearchMatch[]>>;
+  getGitStatus(request: GitStatusRequest): Promise<IpcResponse<GitStatus>>;
+  readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
+  writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
+  statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;
 }

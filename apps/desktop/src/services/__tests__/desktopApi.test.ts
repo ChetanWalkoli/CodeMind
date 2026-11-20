@@ -1,5 +1,67 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CodeMindDesktopAPI } from "@codemind/shared";
 import { desktopApi, isElectronEnvironment } from "../desktopApi";
+
+function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMindDesktopAPI {
+  return {
+    getAppInfo: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { name: "CodeMind", version: "0.1.0", platform: "win32" }
+    }),
+    getPlatformInfo: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        platform: "win32",
+        arch: "x64",
+        electronVersion: "45.4.1",
+        nodeVersion: "24.22.3",
+        chromeVersion: "156.0.0"
+      }
+    }),
+    healthCheck: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { status: "ready", timestamp: new Date().toISOString() }
+    }),
+    getTheme: vi.fn().mockResolvedValue({ ok: true, data: "dark" }),
+    setTheme: vi.fn().mockResolvedValue({ ok: true, data: "light" }),
+    selectWorkspaceFolder: vi.fn().mockResolvedValue({ ok: true, data: null }),
+    openWorkspace: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { rootPath: "C:\\demo", name: "demo" }
+    }),
+    getWorkspaceSession: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { lastWorkspacePath: null, openTabPaths: [], activeTabPath: null, customExcludes: [] }
+    }),
+    saveWorkspaceSession: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { lastWorkspacePath: null, openTabPaths: [], activeTabPath: null, customExcludes: [] }
+    }),
+    getWorkspaceTree: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    searchWorkspaceFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    getGitStatus: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { isGitRepo: false, branch: null, isDirty: false, modifiedCount: 0 }
+    }),
+    readFile: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        relativePath: "index.ts",
+        content: "",
+        contentHash: "hash",
+        modifiedAtMs: 0,
+        sizeBytes: 0,
+        isSecret: false
+      }
+    }),
+    writeFile: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { relativePath: "index.ts", contentHash: "hash2", modifiedAtMs: 1, sizeBytes: 1 }
+    }),
+    statFile: vi.fn().mockResolvedValue({ ok: true, data: { exists: false } }),
+    ...overrides
+  };
+}
 
 describe("desktopApi service", () => {
   afterEach(() => {
@@ -24,19 +86,9 @@ describe("desktopApi service", () => {
   });
 
   it("delegates to window.codemindDesktop when inside Electron and catches bridge rejections", async () => {
-    window.codemindDesktop = {
-      getAppInfo: vi.fn().mockResolvedValue({
-        ok: true,
-        data: { name: "CodeMind", version: "0.1.0", platform: "win32" }
-      }),
-      getPlatformInfo: vi.fn().mockRejectedValue(new Error("IPC channel closed")),
-      healthCheck: vi.fn().mockResolvedValue({
-        ok: true,
-        data: { status: "ready", timestamp: new Date().toISOString() }
-      }),
-      getTheme: vi.fn().mockResolvedValue({ ok: true, data: "dark" }),
-      setTheme: vi.fn().mockResolvedValue({ ok: true, data: "light" })
-    };
+    window.codemindDesktop = createMockBridge({
+      getPlatformInfo: vi.fn().mockRejectedValue(new Error("IPC channel closed"))
+    });
 
     expect(isElectronEnvironment()).toBe(true);
 

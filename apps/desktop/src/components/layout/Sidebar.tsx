@@ -1,17 +1,13 @@
-import { FileCode2 } from "lucide-react";
-import { SAMPLE_DOCUMENTS } from "../../data/sampleDocuments";
+import { FileExplorer } from "../../features/explorer/FileExplorer";
+import { FileSearchPanel } from "../../features/search/FileSearchPanel";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
-import { useEditorStore } from "../../stores/editor.store";
 import { useLayoutStore } from "../../stores/layout.store";
 import { useWorkspaceStore, type NavSectionId } from "../../stores/workspace.store";
 import styles from "./Sidebar.module.scss";
 
 const SECTION_META: Record<NavSectionId, { title: string; futureDescription?: string }> = {
   explorer: { title: "Explorer" },
-  search: {
-    title: "Search",
-    futureDescription: "Project-wide file and symbol search is coming in a future phase."
-  },
+  search: { title: "Search" },
   graph: {
     title: "Codebase Graph",
     futureDescription:
@@ -37,7 +33,6 @@ export function Sidebar() {
   const activeNav = useWorkspaceStore((s) => s.activeNav);
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth);
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
-  const openTab = useEditorStore((s) => s.openTab);
 
   if (!sidebarVisible) {
     return null;
@@ -57,38 +52,11 @@ export function Sidebar() {
       </div>
 
       <div className={styles.body}>
-        {activeNav === "explorer" && (
-          <>
-            <div className={styles.emptyCard}>
-              <p className={styles.emptyTitle}>No Workspace Open</p>
-              <p className={styles.emptyText}>
-                Open a project to begin exploring your codebase. Local folder indexing arrives in
-                Phase 2.
-              </p>
-            </div>
-
-            <div className={styles.scratchSection}>
-              <p className={styles.scratchLabel}>Sample Scratch Buffers</p>
-              <div className={styles.sampleList}>
-                {SAMPLE_DOCUMENTS.map((doc) => (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    className={styles.sampleItem}
-                    onClick={() => openTab({ ...doc, isInMemory: true })}
-                  >
-                    <FileCode2 size={13} aria-hidden="true" />
-                    <span>{doc.title}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
+        {activeNav === "explorer" && <FileExplorer />}
+        {activeNav === "search" && <FileSearchPanel />}
         {activeNav === "settings" && <SettingsPanel />}
 
-        {activeNav !== "explorer" && activeNav !== "settings" && (
+        {activeNav !== "explorer" && activeNav !== "search" && activeNav !== "settings" && (
           <div className={styles.emptyCard}>
             <p className={styles.emptyTitle}>Coming in a future phase.</p>
             <p className={styles.emptyText}>{meta.futureDescription}</p>

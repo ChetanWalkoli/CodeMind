@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { DEFAULT_IGNORE_DIRS } from "@codemind/config";
 import { useEditorStore } from "../../stores/editor.store";
 import { useThemeStore } from "../../stores/theme.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
@@ -15,6 +17,22 @@ export function SettingsPanel() {
   const appInfo = useWorkspaceStore((s) => s.appInfo);
   const platformInfo = useWorkspaceStore((s) => s.platformInfo);
   const isElectron = useWorkspaceStore((s) => s.isElectron);
+  const customExcludes = useWorkspaceStore((s) => s.customExcludes);
+  const setCustomExcludes = useWorkspaceStore((s) => s.setCustomExcludes);
+
+  const [newPattern, setNewPattern] = useState("");
+
+  const handleAddExclude = (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = newPattern.trim();
+    if (!trimmed) return;
+    void setCustomExcludes([...customExcludes, trimmed]);
+    setNewPattern("");
+  };
+
+  const handleRemoveExclude = (pattern: string) => {
+    void setCustomExcludes(customExcludes.filter((p) => p !== pattern));
+  };
 
   return (
     <div className={styles.panel} data-testid="settings-panel">
@@ -113,6 +131,46 @@ export function SettingsPanel() {
               Off
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Workspace Exclusions</h3>
+        <form className={styles.excludeForm} onSubmit={handleAddExclude}>
+          <input
+            type="text"
+            className={styles.excludeInput}
+            placeholder="e.g. *.log or tmp/"
+            aria-label="Add exclusion pattern"
+            value={newPattern}
+            onChange={(e) => setNewPattern(e.target.value)}
+          />
+          <button type="submit" className={styles.addBtn}>
+            Add
+          </button>
+        </form>
+
+        {customExcludes.length > 0 && (
+          <div className={styles.tagList} aria-label="Custom exclusion patterns">
+            {customExcludes.map((pattern) => (
+              <span key={pattern} className={styles.tag}>
+                <span>{pattern}</span>
+                <button
+                  type="button"
+                  className={styles.removeTagBtn}
+                  onClick={() => handleRemoveExclude(pattern)}
+                  aria-label={`Remove ${pattern}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className={styles.metaList}>
+          <span>Default ignored: {DEFAULT_IGNORE_DIRS.slice(0, 6).join(", ")}...</span>
+          <span>Secret files (.env, *.pem, *.key) are excluded from indexing.</span>
         </div>
       </div>
 

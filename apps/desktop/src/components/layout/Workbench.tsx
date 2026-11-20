@@ -1,6 +1,7 @@
 import { useLayoutStore } from "../../stores/layout.store";
 import { CodeEditor } from "../editor/CodeEditor";
 import { EditorTabs } from "../editor/EditorTabs";
+import { ExternalConflictDialog } from "../editor/ExternalConflictDialog";
 import { UnsavedChangesDialog } from "../editor/UnsavedChangesDialog";
 import { ActivityBar } from "./ActivityBar";
 import { BottomPanel } from "./BottomPanel";
@@ -73,6 +74,7 @@ export function Workbench() {
 
       <StatusBar />
       <UnsavedChangesDialog />
+      <ExternalConflictDialog />
     </div>
   );
 }

@@ -74,3 +74,61 @@
   justify-content: space-between;
   gap: 8px;
 }
+
+.excludeForm {
+  display: flex;
+  gap: 6px;
+}
+
+.excludeInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.addBtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 500;
+
+  &:hover {
+    background-color: var(--accent-hover);
+  }
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.removeTagBtn {
+  color: var(--text-muted);
+  font-size: 11px;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}

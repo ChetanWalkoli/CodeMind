@@ -1,19 +1,29 @@
 import { IPC_CHANNELS } from "@codemind/shared";
 
 /**
- * Explicitly allowlisted IPC channels for Phase 1.
- * Filesystem and shell channels are intentionally NOT registered in Phase 1.
+ * Explicitly allowlisted IPC channels for CodeMind (Phase 1 + Phase 2).
+ * Unrestricted filesystem or arbitrary shell execution channels are never permitted.
  */
-export const APPROVED_PHASE1_CHANNELS = [
+export const APPROVED_IPC_CHANNELS = [
   IPC_CHANNELS.APP_GET_INFO,
   IPC_CHANNELS.APP_GET_PLATFORM,
   IPC_CHANNELS.APP_HEALTH_CHECK,
   IPC_CHANNELS.THEME_GET,
-  IPC_CHANNELS.THEME_SET
+  IPC_CHANNELS.THEME_SET,
+  IPC_CHANNELS.WORKSPACE_SELECT_FOLDER,
+  IPC_CHANNELS.WORKSPACE_OPEN,
+  IPC_CHANNELS.WORKSPACE_GET_LAST,
+  IPC_CHANNELS.WORKSPACE_SAVE_SESSION,
+  IPC_CHANNELS.WORKSPACE_GET_TREE,
+  IPC_CHANNELS.WORKSPACE_SEARCH_FILES,
+  IPC_CHANNELS.WORKSPACE_GET_GIT_STATUS,
+  IPC_CHANNELS.FILE_READ,
+  IPC_CHANNELS.FILE_WRITE,
+  IPC_CHANNELS.FILE_STAT
 ] as const;
 
-export type ApprovedPhase1Channel = (typeof APPROVED_PHASE1_CHANNELS)[number];
+export type ApprovedIpcChannel = (typeof APPROVED_IPC_CHANNELS)[number];
 
-export function isApprovedPhase1Channel(channel: string): channel is ApprovedPhase1Channel {
-  return (APPROVED_PHASE1_CHANNELS as readonly string[]).includes(channel);
+export function isApprovedIpcChannel(channel: string): channel is ApprovedIpcChannel {
+  return (APPROVED_IPC_CHANNELS as readonly string[]).includes(channel);
 }
