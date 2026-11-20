@@ -1,0 +1,17 @@
+{
+  "name": "@codemind/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"Desktop dev server will be wired in Phase 1\"",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\""
+  },
+  "dependencies": {
+    "@codemind/config": "workspace:*",
+    "@codemind/shared": "workspace:*"
+  }
+}
