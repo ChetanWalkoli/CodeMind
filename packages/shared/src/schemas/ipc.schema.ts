@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ArchitectureOverviewSchema,
   CodeSymbolSchema,
   DependencyEdgeSchema,
   DependencyGraphSnapshotSchema,
@@ -9,6 +10,7 @@ import {
   ParseDiagnosticSchema,
   SymbolKindSchema,
   SymbolSearchResultSchema,
+  type ArchitectureOverview,
   type CodeSymbol,
   type DependencyEdge,
   type DependencyGraphSnapshot,
@@ -31,6 +33,7 @@ export const IPC_CHANNELS = {
   ENGINE_SEARCH_SYMBOLS: "engine:search-symbols",
   ENGINE_GET_GRAPH: "engine:get-graph",
   ENGINE_GET_FILE_INTEL: "engine:get-file-intel",
+  ENGINE_GET_OVERVIEW: "engine:get-overview",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -304,9 +307,15 @@ export interface CodeMindDesktopAPI {
   searchSymbols(request: EngineSearchSymbolsRequest): Promise<IpcResponse<SymbolSearchResult[]>>;
   getDependencyGraph(request: EngineGraphRequest): Promise<IpcResponse<DependencyGraphSnapshot>>;
   getFileIntelligence(request: EngineFileIntelRequest): Promise<IpcResponse<FileIntelligence>>;
+  getArchitectureOverview(request: EngineGraphRequest): Promise<IpcResponse<ArchitectureOverview>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;
 }
 
-export { IndexSummarySchema, DependencyGraphSnapshotSchema, SymbolSearchResultSchema };
+export {
+  ArchitectureOverviewSchema,
+  IndexSummarySchema,
+  DependencyGraphSnapshotSchema,
+  SymbolSearchResultSchema
+};

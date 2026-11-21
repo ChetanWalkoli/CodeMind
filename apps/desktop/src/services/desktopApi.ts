@@ -2,6 +2,7 @@ import {
   ThemePreferenceSchema,
   WorkspaceSessionSchema,
   type AppInfo,
+  type ArchitectureOverview,
   type CodeMindDesktopAPI,
   type DependencyGraphSnapshot,
   type EngineFileIntelRequest,
@@ -347,6 +348,33 @@ export const desktopApi = {
       };
     }
     return safeInvoke(() => bridge.getFileIntelligence(request), "BRIDGE_ENGINE_FILE_INTEL_FAILED");
+  },
+
+  async getArchitectureOverview(
+    request: EngineGraphRequest
+  ): Promise<IpcResponse<ArchitectureOverview>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          workspaceRoot: request.workspaceRoot,
+          totalFiles: 0,
+          totalSymbols: 0,
+          totalInternalEdges: 0,
+          unresolvedImportCount: 0,
+          diagnosticCount: 0,
+          languages: [],
+          modules: [],
+          externalPackages: [],
+          indexedAt: new Date().toISOString()
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.getArchitectureOverview(request),
+      "BRIDGE_ENGINE_OVERVIEW_FAILED"
+    );
   },
 
   async readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>> {

@@ -1,5 +1,6 @@
 import { ProjectIndexer } from "@codemind/code-engine";
 import {
+  ArchitectureOverviewSchema,
   DependencyGraphSnapshotSchema,
   EngineFileIntelRequestSchema,
   EngineGraphRequestSchema,
@@ -8,6 +9,7 @@ import {
   FileIntelligenceSchema,
   IndexSummarySchema,
   SymbolSearchResultSchema,
+  type ArchitectureOverview,
   type DependencyGraphSnapshot,
   type FileIntelligence,
   type IndexSummary,
@@ -188,6 +190,36 @@ export function createEngineHandlers(deps: {
         return { ok: true, data: FileIntelligenceSchema.parse(intel) };
       } catch (err) {
         return toErrorResponse(err, "ENGINE_FILE_INTEL_FAILED");
+      }
+    },
+
+    async getArchitectureOverview(payload: unknown): Promise<IpcResponse<ArchitectureOverview>> {
+      const parsed = EngineGraphRequestSchema.safeParse(payload);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          error: {
+            code: "INVALID_PAYLOAD",
+            message: parsed.error.issues.map((i) => i.message).join("; ")
+          }
+        };
+      }
+
+      try {
+        const realRoot = deps.authority.getAuthorizedRoot(parsed.data.workspaceRoot);
+        let indexer = deps.engineManager.get(realRoot);
+        if (!indexer) {
+          const excludes = deps.preferences.getWorkspaceSession().customExcludes;
+          indexer = deps.engineManager.getOrCreate(realRoot, excludes);
+          await indexer.indexWorkspace();
+        }
+
+        return {
+          ok: true,
+          data: ArchitectureOverviewSchema.parse(indexer.getArchitectureOverview())
+        };
+      } catch (err) {
+        return toErrorResponse(err, "ENGINE_OVERVIEW_FAILED");
       }
     }
   };

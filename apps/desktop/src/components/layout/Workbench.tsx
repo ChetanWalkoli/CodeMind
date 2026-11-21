@@ -1,4 +1,6 @@
+import { ArchitectureExplorer } from "../../features/architecture/components/ArchitectureExplorer";
 import { useLayoutStore } from "../../stores/layout.store";
+import { useWorkspaceStore } from "../../stores/workspace.store";
 import { CodeEditor } from "../editor/CodeEditor";
 import { EditorTabs } from "../editor/EditorTabs";
 import { ExternalConflictDialog } from "../editor/ExternalConflictDialog";
@@ -14,6 +16,8 @@ import { WorkspaceToolbar } from "./WorkspaceToolbar";
 import styles from "./Workbench.module.scss";
 
 export function Workbench() {
+  const centerView = useWorkspaceStore((s) => s.centerView);
+
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth);
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth);
@@ -47,8 +51,14 @@ export function Workbench() {
 
           <div className={styles.centerRow}>
             <div className={styles.editorColumn}>
-              <EditorTabs />
-              <CodeEditor />
+              {centerView === "architecture" ? (
+                <ArchitectureExplorer />
+              ) : (
+                <>
+                  <EditorTabs />
+                  <CodeEditor />
+                </>
+              )}
             </div>
 
             {rightPanelVisible && (

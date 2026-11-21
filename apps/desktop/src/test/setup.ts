@@ -37,6 +37,15 @@ if (typeof window !== "undefined") {
     configurable: true,
     writable: true
   });
+
+  if (typeof window.ResizeObserver === "undefined") {
+    class MockResizeObserver {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    window.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+  }
 }
 
 afterEach(() => {

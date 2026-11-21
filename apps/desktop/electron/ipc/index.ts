@@ -174,6 +174,12 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
 
   registerSafe(
     ipcMain,
+    IPC_CHANNELS.ENGINE_GET_OVERVIEW,
+    wrapHandler((payload) => engineHandlers.getArchitectureOverview(payload))
+  );
+
+  registerSafe(
+    ipcMain,
     IPC_CHANNELS.FILE_READ,
     wrapHandler((payload) => fileHandlers.readFile(payload))
   );

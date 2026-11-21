@@ -12,6 +12,7 @@ export function FileSearchPanel() {
   const workspace = useWorkspaceStore((s) => s.workspace);
   const customExcludes = useWorkspaceStore((s) => s.customExcludes);
   const persistSession = useWorkspaceStore((s) => s.persistSession);
+  const setCenterView = useWorkspaceStore((s) => s.setCenterView);
   const openWorkspaceFile = useEditorStore((s) => s.openWorkspaceFile);
 
   const [mode, setMode] = useState<SearchMode>("files");
@@ -132,6 +133,7 @@ export function FileSearchPanel() {
               onClick={async () => {
                 const opened = await openWorkspaceFile(workspace.rootPath, match.relativePath);
                 if (opened.ok) {
+                  setCenterView("editor");
                   void persistSession();
                 }
               }}
@@ -151,8 +153,12 @@ export function FileSearchPanel() {
               role="listitem"
               className={styles.resultItem}
               onClick={async () => {
-                const opened = await openWorkspaceFile(workspace.rootPath, symbol.filePath);
+                const opened = await openWorkspaceFile(workspace.rootPath, symbol.filePath, {
+                  line: symbol.startLine,
+                  column: 1
+                });
                 if (opened.ok) {
+                  setCenterView("editor");
                   void persistSession();
                 }
               }}

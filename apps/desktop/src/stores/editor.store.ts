@@ -27,6 +27,13 @@ export interface CursorPosition {
   column: number;
 }
 
+export interface PendingNavigation {
+  tabId: string;
+  line: number;
+  column: number;
+  requestId: number;
+}
+
 export interface EditorSettings {
   minimap: boolean;
   wordWrap: "on" | "off";
@@ -39,6 +46,7 @@ interface EditorState {
   activeTabId: string | null;
   pendingCloseTabId: string | null;
   conflictTabId: string | null;
+  pendingNavigation: PendingNavigation | null;
   cursor: CursorPosition;
   settings: EditorSettings;
   scratchCounter: number;
@@ -46,8 +54,10 @@ interface EditorState {
   openTab: (doc: { id: string; title: string; content: string; isInMemory?: boolean }) => void;
   openWorkspaceFile: (
     workspaceRoot: string,
-    relativePath: string
+    relativePath: string,
+    location?: { line: number; column?: number }
   ) => Promise<{ ok: boolean; error?: string }>;
+  clearPendingNavigation: () => void;
   createScratchTab: (extension?: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTabContent: (tabId: string, content: string) => void;
@@ -114,6 +124,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeTabId: initialTabs[0]?.id ?? null,
   pendingCloseTabId: null,
   conflictTabId: null,
+  pendingNavigation: null,
   cursor: { line: 1, column: 1 },
   settings: {
     minimap: true,
@@ -138,12 +149,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  async openWorkspaceFile(workspaceRoot, relativePath) {
+  async openWorkspaceFile(workspaceRoot, relativePath, location) {
     const normalizedRel = relativePath.replace(/\\/g, "/");
     const tabId = makeWorkspaceTabId(workspaceRoot, normalizedRel);
+    const navTarget: PendingNavigation | null = location
+      ? {
+          tabId,
+          line: Math.max(1, location.line),
+          column: Math.max(1, location.column ?? 1),
+          requestId: Date.now()
+        }
+      : null;
+
     const existing = get().tabs.find((t) => t.id === tabId);
     if (existing) {
-      set({ activeTabId: existing.id });
+      set({
+        activeTabId: existing.id,
+        pendingNavigation: navTarget,
+        cursor: navTarget ? { line: navTarget.line, column: navTarget.column } : get().cursor
+      });
       return { ok: true };
     }
 
@@ -171,10 +195,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       tabs: [...state.tabs, nextTab],
       activeTabId: nextTab.id,
-      cursor: { line: 1, column: 1 }
+      pendingNavigation: navTarget,
+      cursor: navTarget
+        ? { line: navTarget.line, column: navTarget.column }
+        : { line: 1, column: 1 }
     }));
 
     return { ok: true };
+  },
+
+  clearPendingNavigation() {
+    set({ pendingNavigation: null });
   },
 
   createScratchTab(extension = ".ts") {

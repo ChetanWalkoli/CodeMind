@@ -373,5 +373,21 @@ describe("Phase 2 Workspace & Local Filesystem Engine", () => {
     if (updatedSymRes.ok) {
       expect(updatedSymRes.data.map((r) => r.symbol.name)).toContain("freshlyAddedFn");
     }
+
+    // Overview IPC returns factual metrics and rejects unauthorized roots
+    const unauthOverview = await ipcMain.invoke(IPC_CHANNELS.ENGINE_GET_OVERVIEW, {
+      workspaceRoot: outsideDir
+    });
+    expect(unauthOverview.ok).toBe(false);
+
+    const overviewRes = await ipcMain.invoke<{ totalFiles: number; totalSymbols: number }>(
+      IPC_CHANNELS.ENGINE_GET_OVERVIEW,
+      { workspaceRoot: rootPath }
+    );
+    expect(overviewRes.ok).toBe(true);
+    if (overviewRes.ok) {
+      expect(overviewRes.data.totalFiles).toBeGreaterThanOrEqual(2);
+      expect(overviewRes.data.totalSymbols).toBeGreaterThanOrEqual(3);
+    }
   });
 });

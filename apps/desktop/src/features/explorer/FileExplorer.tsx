@@ -58,6 +58,7 @@ function TreeBranch({ nodes, depth, workspaceRoot }: TreeBranchProps) {
   const loadingPaths = useWorkspaceStore((s) => s.loadingPaths);
   const toggleDirectory = useWorkspaceStore((s) => s.toggleDirectory);
   const persistSession = useWorkspaceStore((s) => s.persistSession);
+  const setCenterView = useWorkspaceStore((s) => s.setCenterView);
 
   const tabs = useEditorStore((s) => s.tabs);
   const activeTabId = useEditorStore((s) => s.activeTabId);
@@ -142,6 +143,7 @@ function TreeBranch({ nodes, depth, workspaceRoot }: TreeBranchProps) {
               if (node.unreadable) return;
               const result = await openWorkspaceFile(workspaceRoot, node.relativePath);
               if (result.ok) {
+                setCenterView("editor");
                 void persistSession();
               }
             }}

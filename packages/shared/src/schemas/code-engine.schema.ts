@@ -132,3 +132,40 @@ export const SymbolSearchResultSchema = z.object({
 });
 
 export type SymbolSearchResult = z.infer<typeof SymbolSearchResultSchema>;
+
+export const LanguageCountSchema = z.object({
+  language: SupportedLanguageSchema,
+  count: z.number().int().nonnegative()
+});
+
+export type LanguageCount = z.infer<typeof LanguageCountSchema>;
+
+export const ModuleGroupSummarySchema = z.object({
+  name: z.string().min(1),
+  fileCount: z.number().int().nonnegative(),
+  symbolCount: z.number().int().nonnegative()
+});
+
+export type ModuleGroupSummary = z.infer<typeof ModuleGroupSummarySchema>;
+
+export const ExternalPackageUsageSchema = z.object({
+  name: z.string().min(1),
+  importCount: z.number().int().positive()
+});
+
+export type ExternalPackageUsage = z.infer<typeof ExternalPackageUsageSchema>;
+
+export const ArchitectureOverviewSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  totalFiles: z.number().int().nonnegative(),
+  totalSymbols: z.number().int().nonnegative(),
+  totalInternalEdges: z.number().int().nonnegative(),
+  unresolvedImportCount: z.number().int().nonnegative(),
+  diagnosticCount: z.number().int().nonnegative(),
+  languages: z.array(LanguageCountSchema),
+  modules: z.array(ModuleGroupSummarySchema),
+  externalPackages: z.array(ExternalPackageUsageSchema),
+  indexedAt: z.string().datetime()
+});
+
+export type ArchitectureOverview = z.infer<typeof ArchitectureOverviewSchema>;

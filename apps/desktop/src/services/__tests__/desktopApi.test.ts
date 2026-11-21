@@ -70,6 +70,21 @@ function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMind
         diagnostics: []
       }
     }),
+    getArchitectureOverview: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        workspaceRoot: "C:\\demo",
+        totalFiles: 0,
+        totalSymbols: 0,
+        totalInternalEdges: 0,
+        unresolvedImportCount: 0,
+        diagnosticCount: 0,
+        languages: [],
+        modules: [],
+        externalPackages: [],
+        indexedAt: new Date().toISOString()
+      }
+    }),
     readFile: vi.fn().mockResolvedValue({
       ok: true,
       data: {

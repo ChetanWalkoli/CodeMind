@@ -1,3 +1,4 @@
+import { ArchitectureOverviewPanel } from "../../features/architecture/components/ArchitectureOverviewPanel";
 import { FileExplorer } from "../../features/explorer/FileExplorer";
 import { FileSearchPanel } from "../../features/search/FileSearchPanel";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
@@ -54,14 +55,18 @@ export function Sidebar() {
       <div className={styles.body}>
         {activeNav === "explorer" && <FileExplorer />}
         {activeNav === "search" && <FileSearchPanel />}
+        {activeNav === "graph" && <ArchitectureOverviewPanel />}
         {activeNav === "settings" && <SettingsPanel />}
 
-        {activeNav !== "explorer" && activeNav !== "search" && activeNav !== "settings" && (
-          <div className={styles.emptyCard}>
-            <p className={styles.emptyTitle}>Coming in a future phase.</p>
-            <p className={styles.emptyText}>{meta.futureDescription}</p>
-          </div>
-        )}
+        {activeNav !== "explorer" &&
+          activeNav !== "search" &&
+          activeNav !== "graph" &&
+          activeNav !== "settings" && (
+            <div className={styles.emptyCard}>
+              <p className={styles.emptyTitle}>Coming in a future phase.</p>
+              <p className={styles.emptyText}>{meta.futureDescription}</p>
+            </div>
+          )}
       </div>
     </aside>
   );

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
+import type { editor as MonacoEditorNS } from "monaco-editor";
 import { useEditorStore } from "../../stores/editor.store";
 import { useThemeStore } from "../../stores/theme.store";
 import { EmptyEditorState } from "./EmptyEditorState";
@@ -9,11 +10,14 @@ import styles from "./CodeEditor.module.scss";
 export function CodeEditor() {
   const tabs = useEditorStore((s) => s.tabs);
   const activeTabId = useEditorStore((s) => s.activeTabId);
+  const pendingNavigation = useEditorStore((s) => s.pendingNavigation);
+  const clearPendingNavigation = useEditorStore((s) => s.clearPendingNavigation);
   const settings = useEditorStore((s) => s.settings);
   const updateTabContent = useEditorStore((s) => s.updateTabContent);
   const setCursor = useEditorStore((s) => s.setCursor);
   const theme = useThemeStore((s) => s.theme);
 
+  const editorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,6 +29,21 @@ export function CodeEditor() {
   }, []);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+
+  useEffect(() => {
+    if (!pendingNavigation || !activeTab || pendingNavigation.tabId !== activeTab.id) {
+      return;
+    }
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+    const { line, column } = pendingNavigation;
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column });
+    editor.focus();
+    clearPendingNavigation();
+  }, [pendingNavigation, activeTab, clearPendingNavigation]);
 
   if (!activeTab) {
     return <EmptyEditorState />;
@@ -39,12 +58,21 @@ export function CodeEditor() {
   }
 
   const handleMount: OnMount = (editor) => {
+    editorRef.current = editor;
     editor.onDidChangeCursorPosition((event) => {
       setCursor({
         line: event.position.lineNumber,
         column: event.position.column
       });
     });
+
+    const nav = useEditorStore.getState().pendingNavigation;
+    if (nav && nav.tabId === activeTab.id) {
+      editor.revealLineInCenter(nav.line);
+      editor.setPosition({ lineNumber: nav.line, column: nav.column });
+      clearPendingNavigation();
+    }
+
     editor.focus();
   };
 

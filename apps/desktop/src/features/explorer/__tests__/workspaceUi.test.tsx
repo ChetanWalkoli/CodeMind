@@ -146,6 +146,21 @@ describe("Phase 2 Workspace UI Integration", () => {
           diagnostics: []
         }
       }),
+      getArchitectureOverview: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          workspaceRoot: "C:\\projects\\demo",
+          totalFiles: 1,
+          totalSymbols: 1,
+          totalInternalEdges: 0,
+          unresolvedImportCount: 0,
+          diagnosticCount: 0,
+          languages: [{ language: "typescript", count: 1 }],
+          modules: [{ name: "src", fileCount: 1, symbolCount: 1 }],
+          externalPackages: [],
+          indexedAt: new Date().toISOString()
+        }
+      }),
       readFile: vi.fn().mockResolvedValue({
         ok: true,
         data: {
@@ -312,6 +327,21 @@ describe("Phase 2 Workspace UI Integration", () => {
           dependencies: [],
           dependents: [],
           diagnostics: []
+        }
+      }),
+      getArchitectureOverview: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          workspaceRoot: "C:\\projects\\demo",
+          totalFiles: 1,
+          totalSymbols: 1,
+          totalInternalEdges: 0,
+          unresolvedImportCount: 0,
+          diagnosticCount: 0,
+          languages: [{ language: "typescript", count: 1 }],
+          modules: [{ name: "src", fileCount: 1, symbolCount: 1 }],
+          externalPackages: [],
+          indexedAt: new Date().toISOString()
         }
       }),
       readFile: readFileMock,

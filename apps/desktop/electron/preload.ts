@@ -48,6 +48,8 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
     ipcRenderer.invoke(IPC_CHANNELS.ENGINE_GET_GRAPH, request),
   getFileIntelligence: (request: EngineFileIntelRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.ENGINE_GET_FILE_INTEL, request),
+  getArchitectureOverview: (request: EngineGraphRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENGINE_GET_OVERVIEW, request),
   readFile: (request: FileReadRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_READ, request),
   writeFile: (request: FileWriteRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_WRITE, request),
   statFile: (request: FileStatRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_STAT, request)

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type {
+  ArchitectureOverview,
   CodeSymbol,
   DependencyEdge,
   DependencyGraphSnapshot,
@@ -8,6 +9,7 @@ import type {
   ImportRecord,
   IndexSummary,
   ParseDiagnostic,
+  SupportedLanguage,
   SymbolSearchResult
 } from "@codemind/shared";
 import { DependencyGraph } from "../graph/dependencyGraph.js";
@@ -376,6 +378,71 @@ export class ProjectIndexer {
 
   public getGraphSnapshot(): DependencyGraphSnapshot {
     return this.graph.toSnapshot();
+  }
+
+  /**
+   * Compute factual architecture overview metrics strictly from indexed files,
+   * symbols, imports, and dependency edges.
+   */
+  public getArchitectureOverview(): ArchitectureOverview {
+    const languageCounts = new Map<SupportedLanguage, number>();
+    const moduleStats = new Map<string, { fileCount: number; symbolCount: number }>();
+    const externalCounts = new Map<string, number>();
+
+    let totalSymbols = 0;
+    let unresolvedImportCount = 0;
+    let diagnosticCount = 0;
+
+    for (const entry of this.files.values()) {
+      const lang = entry.node.language;
+      languageCounts.set(lang, (languageCounts.get(lang) ?? 0) + 1);
+
+      const segments = entry.node.path.split("/");
+      const moduleName = segments.length > 1 ? segments[0]! : "(root)";
+      const mod = moduleStats.get(moduleName) ?? { fileCount: 0, symbolCount: 0 };
+      mod.fileCount += 1;
+      mod.symbolCount += entry.symbols.length;
+      moduleStats.set(moduleName, mod);
+
+      totalSymbols += entry.symbols.length;
+      diagnosticCount += entry.diagnostics.length;
+
+      for (const imp of entry.imports) {
+        if (imp.isExternal) {
+          const pkgName = imp.specifier.startsWith("@")
+            ? imp.specifier.split("/").slice(0, 2).join("/")
+            : (imp.specifier.split("/")[0] ?? imp.specifier);
+          externalCounts.set(pkgName, (externalCounts.get(pkgName) ?? 0) + 1);
+        } else if (imp.resolvedPath === null) {
+          unresolvedImportCount += 1;
+        }
+      }
+    }
+
+    const languages = Array.from(languageCounts.entries())
+      .map(([language, count]) => ({ language, count }))
+      .sort((a, b) => b.count - a.count || a.language.localeCompare(b.language));
+
+    const modules = Array.from(moduleStats.entries())
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.fileCount - a.fileCount || a.name.localeCompare(b.name));
+
+    const externalPackages = Array.from(externalCounts.entries())
+      .map(([name, importCount]) => ({ name, importCount }))
+      .sort((a, b) => b.importCount - a.importCount || a.name.localeCompare(b.name));
+
+    return {
+      workspaceRoot: this.workspaceRoot,
+      totalFiles: this.files.size,
+      totalSymbols,
+      totalInternalEdges: this.graph.edgeCount,
+      unresolvedImportCount,
+      diagnosticCount,
+      languages,
+      modules,
+      externalPackages,
+      indexedAt: this.lastIndexedAt
+    };
   }
 
   public searchSymbols(query: string, options?: SymbolSearchOptions): SymbolSearchResult[] {

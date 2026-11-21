@@ -212,4 +212,17 @@ describe("@codemind/code-engine — Phase 3 Code Intelligence Engine", () => {
     const allInternalMatches = indexer.searchSymbols("internalHelper", { exportedOnly: false });
     expect(allInternalMatches).toHaveLength(1);
   });
+
+  it("computes factual architecture overview metrics strictly from indexed files", async () => {
+    const indexer = new ProjectIndexer(tempDir);
+    await indexer.indexWorkspace();
+
+    const overview = indexer.getArchitectureOverview();
+    expect(overview.totalFiles).toBeGreaterThanOrEqual(4);
+    expect(overview.totalSymbols).toBeGreaterThanOrEqual(7);
+    expect(overview.totalInternalEdges).toBe(3);
+    expect(overview.modules.some((m) => m.name === "src")).toBe(true);
+    expect(overview.languages.some((l) => l.language === "typescript")).toBe(true);
+    expect(overview.externalPackages.some((p) => p.name === "react")).toBe(true);
+  });
 });

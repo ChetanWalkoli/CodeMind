@@ -9,8 +9,11 @@ import type {
   WorkspaceSession
 } from "@codemind/shared";
 import { desktopApi } from "../services/desktopApi";
+import { useArchitectureStore } from "./architecture.store";
 import { useEditorStore } from "./editor.store";
 import { useLayoutStore } from "./layout.store";
+
+export type CenterViewMode = "editor" | "architecture";
 
 export type NavSectionId =
   "explorer" | "search" | "graph" | "intent" | "decisions" | "impact" | "settings";
@@ -22,6 +25,7 @@ export type BridgeStatus = "initializing" | "ready" | "degraded";
 interface WorkspaceState {
   activeNav: NavSectionId;
   activeBottomTab: BottomPanelTabId;
+  centerView: CenterViewMode;
   isElectron: boolean;
   bridgeStatus: BridgeStatus;
   appInfo: AppInfo | null;
@@ -41,6 +45,7 @@ interface WorkspaceState {
 
   setActiveNav: (nav: NavSectionId) => void;
   setActiveBottomTab: (tab: BottomPanelTabId) => void;
+  setCenterView: (view: CenterViewMode) => void;
   initializeRuntime: () => Promise<void>;
   openFolderDialog: () => Promise<boolean>;
   openWorkspacePath: (
@@ -61,6 +66,7 @@ interface WorkspaceState {
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeNav: "explorer",
   activeBottomTab: "problems",
+  centerView: "editor",
   isElectron: desktopApi.isElectron(),
   bridgeStatus: "initializing",
   appInfo: null,
@@ -79,11 +85,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaceError: null,
 
   setActiveNav(nav) {
-    set({ activeNav: nav });
+    set((state) => ({
+      activeNav: nav,
+      centerView: nav === "graph" ? "architecture" : state.centerView
+    }));
   },
 
   setActiveBottomTab(tab) {
     set({ activeBottomTab: tab });
+  },
+
+  setCenterView(view) {
+    set({ centerView: view });
   },
 
   async initializeRuntime() {
@@ -155,7 +168,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       workspaceError: treeRes.ok ? null : treeRes.error.message
     });
 
-    // Clear sample scratch tabs when switching into a real workspace.
+    // Clear sample scratch tabs & previous architecture state when switching into a real workspace.
+    useArchitectureStore.getState().clear();
     const editorStore = useEditorStore.getState();
     editorStore.clearWorkspaceTabs();
 
