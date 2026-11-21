@@ -13,6 +13,27 @@ export const AIMessageSchema = z.object({
 
 export type AIMessage = z.infer<typeof AIMessageSchema>;
 
+export interface AITimeoutPolicy {
+  /** Max duration for local context verification and budgeting before contacting the provider. */
+  contextPrepTimeoutMs: number;
+  /** Max duration waiting for the initial HTTP connection / stream open. */
+  connectionTimeoutMs: number;
+  /** Max duration waiting for the first response event after connection opens (covers model reasoning/TTFT). */
+  firstResponseTimeoutMs: number;
+  /** Max inactivity gap between consecutive stream events once streaming is underway. */
+  streamIdleTimeoutMs: number;
+  /** Hard upper bound for total generation duration across the entire request. */
+  overallTimeoutMs: number;
+}
+
+export const DEFAULT_TIMEOUT_POLICY: AITimeoutPolicy = {
+  contextPrepTimeoutMs: 15_000,
+  connectionTimeoutMs: 20_000,
+  firstResponseTimeoutMs: 45_000,
+  streamIdleTimeoutMs: 25_000,
+  overallTimeoutMs: 120_000
+};
+
 export interface AIRequest {
   requestId?: string;
   model?: string;
@@ -21,6 +42,7 @@ export interface AIRequest {
   maxTokens?: number;
   responseFormat?: "text" | "json";
   timeoutMs?: number;
+  timeouts?: Partial<AITimeoutPolicy>;
   signal?: AbortSignal;
 }
 
@@ -36,6 +58,7 @@ export interface AIResponse {
   provider: string;
   finishReason?: string | null;
   usage?: AIUsage;
+  retryCount?: number;
 }
 
 export type AIStreamEvent =

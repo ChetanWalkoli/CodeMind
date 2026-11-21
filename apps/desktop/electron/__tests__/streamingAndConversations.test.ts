@@ -3,7 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AIProvider, AIRequest, AIStreamEvent } from "@codemind/ai-core";
+import {
+  AIProviderError,
+  type AIProvider,
+  type AIRequest,
+  type AIStreamEvent
+} from "@codemind/ai-core";
 import {
   IPC_CHANNELS,
   type AIContextApprovalRecord,
@@ -363,5 +368,63 @@ describe("Milestones 5.6, 5.7 & 5.8 — Streaming, Cancellation, Conversations &
     });
     expect(delRes.ok).toBe(true);
     if (delRes.ok) expect(delRes.data.deleted).toBe(true);
+  });
+
+  it("reports partialContentReceived and timeoutCategory on mid-stream idle timeout with privacy-safe diagnostics", async () => {
+    const snapshot = await buildAndApproveSnapshot();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    streamImpl = async function* () {
+      yield { type: "delta", text: "Verified partial answer..." };
+      throw new AIProviderError(
+        "TIMEOUT",
+        "The response stream became inactive for 25s and was interrupted.",
+        {
+          provider: "gemini",
+          retryable: false,
+          timeoutCategory: "stream-idle",
+          retryCount: 0
+        }
+      );
+    };
+
+    await ipcMain.invoke<AIStreamStartResponse>(IPC_CHANNELS.AI_STREAM_START, {
+      requestId: "req-partial-idle",
+      workspaceRoot: workspaceDir,
+      snapshotId: snapshot.snapshotId
+    });
+
+    await waitForCondition(() =>
+      emittedEvents.some((e) => e.requestId === "req-partial-idle" && e.type === "stream:error")
+    );
+
+    const errEvt = emittedEvents.find(
+      (e) => e.requestId === "req-partial-idle" && e.type === "stream:error"
+    );
+    expect(errEvt).toBeDefined();
+    if (errEvt && errEvt.type === "stream:error") {
+      expect(errEvt.code).toBe("TIMEOUT");
+      expect(errEvt.timeoutCategory).toBe("stream-idle");
+      expect(errEvt.partialContentReceived).toBe(true);
+    }
+
+    // Verify structured diagnostic log contains required telemetry and NO sensitive content
+    const diagCall = warnSpy.mock.calls.find(
+      (args) => typeof args[0] === "string" && args[0].includes("[CodeMind AI Stream]")
+    );
+    expect(diagCall).toBeDefined();
+    const serialized = String(diagCall?.[1] ?? "");
+    const parsed = JSON.parse(serialized) as Record<string, unknown>;
+    expect(parsed.requestId).toBe("req-partial-idle");
+    expect(parsed.timeoutCategory).toBe("stream-idle");
+    expect(parsed.partialResponseReceived).toBe(true);
+    expect(parsed.errorCode).toBe("TIMEOUT");
+    expect(typeof parsed.contextPrepDurationMs).toBe("number");
+    expect(typeof parsed.timeToFirstEventMs).toBe("number");
+    expect(typeof parsed.totalElapsedMs).toBe("number");
+    expect(serialized).not.toContain("AIza");
+    expect(serialized).not.toContain("Verified partial answer");
+
+    warnSpy.mockRestore();
   });
 });

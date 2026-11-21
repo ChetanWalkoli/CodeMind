@@ -294,7 +294,11 @@ export function ContextPreviewPanel() {
         }
       } else if (evt.type === "stream:error") {
         setStreamState("failed");
-        setStreamProgress(null);
+        setStreamProgress(
+          evt.partialContentReceived
+            ? "Partial response preserved before stream interruption. Click Retry to try again."
+            : null
+        );
         setActiveRequestId(null);
         setError(evt.message);
         cleanupStreamSubscription();

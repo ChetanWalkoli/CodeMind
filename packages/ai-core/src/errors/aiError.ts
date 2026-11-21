@@ -9,11 +9,32 @@ export type AIErrorCode =
   | "INVALID_RESPONSE"
   | "PROVIDER_ERROR";
 
+export type AITimeoutCategory =
+  "context-preparation" | "connection" | "first-response" | "stream-idle" | "overall-generation";
+
+export function formatTimeoutMessage(category: AITimeoutCategory, timeoutMs: number): string {
+  const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+  switch (category) {
+    case "context-preparation":
+      return `Context preparation timed out after ${seconds}s before contacting Google Gemini.`;
+    case "connection":
+      return `Connection to Google Gemini timed out after ${seconds}s. Check your network connection and try again.`;
+    case "first-response":
+      return `Google Gemini did not send an initial response within ${seconds}s. The model may be under heavy load — try again or switch models in Settings.`;
+    case "stream-idle":
+      return `The response stream became inactive for ${seconds}s and was interrupted. You can retry the request.`;
+    case "overall-generation":
+      return `Generation exceeded the ${seconds}s maximum duration and was stopped. Try narrowing the context or retrying.`;
+  }
+}
+
 export interface AIProviderErrorOptions {
   provider?: string;
   statusCode?: number;
   retryable?: boolean;
   retryAfterMs?: number;
+  timeoutCategory?: AITimeoutCategory;
+  retryCount?: number;
   cause?: unknown;
 }
 
@@ -49,6 +70,8 @@ export class AIProviderError extends Error {
   public readonly statusCode?: number;
   public readonly retryable: boolean;
   public readonly retryAfterMs?: number;
+  public readonly timeoutCategory?: AITimeoutCategory;
+  public readonly retryCount?: number;
 
   constructor(code: AIErrorCode, message: string, options: AIProviderErrorOptions = {}) {
     super(
@@ -61,6 +84,8 @@ export class AIProviderError extends Error {
     this.statusCode = options.statusCode;
     this.retryable = options.retryable ?? false;
     this.retryAfterMs = options.retryAfterMs;
+    this.timeoutCategory = options.timeoutCategory;
+    this.retryCount = options.retryCount;
   }
 }
 

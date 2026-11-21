@@ -2,14 +2,18 @@ import crypto from "node:crypto";
 import {
   AIProviderError,
   AIRateLimiter,
+  DEFAULT_TIMEOUT_POLICY,
   DESKTOP_RATE_LIMIT_CONFIG,
+  formatTimeoutMessage,
   getStructuredInstructions,
   isAbortError,
   normalizeProviderError,
   parseAndValidateStructuredResponse,
   redactSecrets,
   resolveStructuredKindForTask,
-  type AIMessage
+  type AIMessage,
+  type AITimeoutCategory,
+  type AITimeoutPolicy
 } from "@codemind/ai-core";
 import {
   AIStreamIpcEventSchema,
@@ -26,6 +30,23 @@ import type { AIProviderManager } from "./providerManager.js";
 import type { SecureTransmissionGate } from "./transmissionGate.js";
 import type { AIUsageStore } from "./usageStore.js";
 
+export interface AIStreamDiagnosticLog {
+  requestId: string;
+  model: string;
+  contextPrepDurationMs: number;
+  selectedFileCount: number;
+  estimatedInputTokens: number;
+  timeToFirstEventMs: number | null;
+  totalElapsedMs: number;
+  timeoutCategory: AITimeoutCategory | null;
+  retryCount: number;
+  outcome: "success" | "error" | "cancelled";
+  errorCode: string | null;
+  partialResponseReceived: boolean;
+}
+
+export type StreamDiagnosticsLogger = (entry: AIStreamDiagnosticLog) => void;
+
 interface ActiveStreamEntry {
   requestId: string;
   provider: AIProviderName;
@@ -41,6 +62,7 @@ export type StreamEventEmitter = (event: AIStreamIpcEvent) => void;
  * - Isolates concurrent streams by requestId.
  * - Supports renderer cancellation and credential-change cancellation.
  * - Buffers & validates structured JSON responses before emitting stream:complete.
+ * - Emits structured, privacy-safe diagnostics (never logging prompts, code, or keys).
  * - Records privacy-safe usage metrics & optional local conversation history.
  */
 export class AIStreamManager {
@@ -50,6 +72,8 @@ export class AIStreamManager {
   private readonly rateLimiter: AIRateLimiter;
   private readonly usageStore?: AIUsageStore;
   private readonly conversationStore?: ConversationStore;
+  private readonly timeoutPolicy: AITimeoutPolicy;
+  private readonly logDiagnostics: StreamDiagnosticsLogger;
 
   constructor(deps: {
     transmissionGate: SecureTransmissionGate;
@@ -57,12 +81,27 @@ export class AIStreamManager {
     rateLimiter?: AIRateLimiter;
     usageStore?: AIUsageStore;
     conversationStore?: ConversationStore;
+    timeouts?: Partial<AITimeoutPolicy>;
+    onDiagnostics?: StreamDiagnosticsLogger;
   }) {
     this.transmissionGate = deps.transmissionGate;
     this.providerManager = deps.providerManager;
     this.rateLimiter = deps.rateLimiter ?? new AIRateLimiter(DESKTOP_RATE_LIMIT_CONFIG);
     this.usageStore = deps.usageStore;
     this.conversationStore = deps.conversationStore;
+    this.timeoutPolicy = {
+      ...DEFAULT_TIMEOUT_POLICY,
+      ...deps.timeouts
+    };
+    this.logDiagnostics =
+      deps.onDiagnostics ??
+      ((entry) => {
+        if (entry.outcome === "error") {
+          console.warn("[CodeMind AI Stream]", JSON.stringify(entry));
+        } else {
+          console.info("[CodeMind AI Stream]", JSON.stringify(entry));
+        }
+      });
   }
 
   private emitSafe(emit: StreamEventEmitter, event: AIStreamIpcEvent): void {
@@ -88,12 +127,26 @@ export class AIStreamManager {
     const structured = Boolean(params.structured);
 
     // 1. Enforce SecureTransmissionGate synchronously BEFORE registering or calling provider
+    const contextPrepStart = Date.now();
     const verified = this.transmissionGate.verifyAndPrepare({
       workspaceRoot: params.workspaceRoot,
       snapshotId: params.snapshotId,
       modelId: params.modelId,
       maxOutputTokens: params.maxOutputTokens
     });
+    const contextPrepDurationMs = Date.now() - contextPrepStart;
+
+    if (contextPrepDurationMs > this.timeoutPolicy.contextPrepTimeoutMs) {
+      throw new AIProviderError(
+        "TIMEOUT",
+        formatTimeoutMessage("context-preparation", this.timeoutPolicy.contextPrepTimeoutMs),
+        {
+          provider: verified.provider,
+          retryable: false,
+          timeoutCategory: "context-preparation"
+        }
+      );
+    }
 
     // 2. Enforce concurrency & sliding-window rate limits
     const releaseSlot = this.rateLimiter.acquire();
@@ -157,6 +210,30 @@ export class AIStreamManager {
     void (async () => {
       let accumulated = "";
       let reportedUsage: AIUsageMetrics | undefined;
+      let timeToFirstEventMs: number | null = null;
+      let retryCount = 0;
+
+      const emitDiagnostic = (
+        outcome: "success" | "error" | "cancelled",
+        errorCode: string | null,
+        timeoutCategory: AITimeoutCategory | null,
+        finalRetryCount: number
+      ) => {
+        this.logDiagnostics({
+          requestId,
+          model: verified.modelId,
+          contextPrepDurationMs,
+          selectedFileCount: verified.snapshot.items.length,
+          estimatedInputTokens: verified.budget.allocation.totalEstimatedInputTokens,
+          timeToFirstEventMs,
+          totalElapsedMs: Date.now() - startedAt,
+          timeoutCategory,
+          retryCount: finalRetryCount,
+          outcome,
+          errorCode,
+          partialResponseReceived: accumulated.length > 0
+        });
+      };
 
       try {
         this.emitSafe(emit, {
@@ -179,18 +256,24 @@ export class AIStreamManager {
           });
         }
 
+        const streamStartMs = Date.now();
         const streamIter = providerInstance.stream({
           requestId,
           model: verified.modelId,
           messages: finalMessages,
           maxTokens: verified.budget.allocation.reservedOutputTokens,
           responseFormat: structured ? "json" : "text",
+          timeouts: this.timeoutPolicy,
           signal: controller.signal
         });
 
         for await (const chunk of streamIter) {
           if (controller.signal.aborted) {
             break;
+          }
+
+          if (timeToFirstEventMs === null) {
+            timeToFirstEventMs = Date.now() - streamStartMs;
           }
 
           if (chunk.type === "delta") {
@@ -219,6 +302,9 @@ export class AIStreamManager {
             if (chunk.response.usage) {
               reportedUsage = chunk.response.usage;
             }
+            if (typeof chunk.response.retryCount === "number") {
+              retryCount = chunk.response.retryCount;
+            }
           } else if (chunk.type === "error") {
             throw new AIProviderError("PROVIDER_ERROR", chunk.message, {
               provider: verified.provider,
@@ -241,8 +327,10 @@ export class AIStreamManager {
             "cancelled",
             "CANCELLED",
             Date.now() - startedAt,
+            retryCount,
             reportedUsage
           );
+          emitDiagnostic("cancelled", "CANCELLED", null, retryCount);
           return;
         }
 
@@ -290,8 +378,10 @@ export class AIStreamManager {
           "success",
           null,
           Date.now() - startedAt,
+          retryCount,
           reportedUsage
         );
+        emitDiagnostic("success", null, null, retryCount);
 
         if (params.conversationId && this.conversationStore) {
           try {
@@ -329,8 +419,10 @@ export class AIStreamManager {
             "cancelled",
             "CANCELLED",
             Date.now() - startedAt,
+            retryCount,
             reportedUsage
           );
+          emitDiagnostic("cancelled", "CANCELLED", null, retryCount);
           return;
         }
 
@@ -344,12 +436,17 @@ export class AIStreamManager {
                 })
               : normalizeProviderError(err, verified.provider);
 
+        const finalRetryCount = safeError.retryCount ?? retryCount;
+        const timeoutCategory = safeError.timeoutCategory ?? null;
+
         this.emitSafe(emit, {
           type: "stream:error",
           requestId,
           code: safeError.code,
           message: redactSecrets(safeError.message),
           retryable: safeError.retryable,
+          timeoutCategory: timeoutCategory ?? undefined,
+          partialContentReceived: accumulated.length > 0,
           timestamp: new Date().toISOString()
         });
 
@@ -359,8 +456,10 @@ export class AIStreamManager {
           "error",
           safeError.code,
           Date.now() - startedAt,
+          finalRetryCount,
           reportedUsage
         );
+        emitDiagnostic("error", safeError.code, timeoutCategory, finalRetryCount);
       } finally {
         this.activeStreams.delete(requestId);
         releaseSlot();
@@ -402,6 +501,7 @@ export class AIStreamManager {
     outcome: "success" | "error" | "cancelled",
     errorCategory: string | null,
     durationMs: number,
+    retryCount: number,
     usage?: AIUsageMetrics
   ): void {
     if (!this.usageStore) return;
@@ -412,7 +512,7 @@ export class AIStreamManager {
       taskType: verified.snapshot.taskType,
       outcome,
       errorCategory,
-      retryCount: 0,
+      retryCount,
       durationMs,
       inputTokens: usage?.inputTokens ?? verified.budget.allocation.totalEstimatedInputTokens,
       outputTokens: usage?.outputTokens ?? 0,

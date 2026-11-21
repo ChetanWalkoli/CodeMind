@@ -300,6 +300,16 @@ export const VerifiedSourceReferenceSchema = SourceReferenceSchema.extend({
 
 export type VerifiedSourceReferenceItem = z.infer<typeof VerifiedSourceReferenceSchema>;
 
+export const AITimeoutCategorySchema = z.enum([
+  "context-preparation",
+  "connection",
+  "first-response",
+  "stream-idle",
+  "overall-generation"
+]);
+
+export type AITimeoutCategory = z.infer<typeof AITimeoutCategorySchema>;
+
 export const AIStreamIpcEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("stream:start"),
@@ -351,6 +361,8 @@ export const AIStreamIpcEventSchema = z.discriminatedUnion("type", [
     code: z.string().min(1),
     message: z.string().min(1),
     retryable: z.boolean(),
+    timeoutCategory: AITimeoutCategorySchema.optional(),
+    partialContentReceived: z.boolean().optional(),
     timestamp: z.string().datetime()
   }),
   z.object({

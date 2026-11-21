@@ -1,4 +1,9 @@
-import { AIProviderError, normalizeProviderError } from "../errors/aiError.js";
+import {
+  AIProviderError,
+  formatTimeoutMessage,
+  normalizeProviderError,
+  type AITimeoutCategory
+} from "../errors/aiError.js";
 
 export interface RetryPolicy {
   maxRetries: number;
@@ -108,30 +113,34 @@ export function createLinkedAbortSignal(
  * and controlled exponential backoff ONLY for retryable errors.
  */
 export async function executeWithRetry<T>(
-  operation: (signal: AbortSignal) => Promise<T>,
+  operation: (signal: AbortSignal, attempt: number) => Promise<T>,
   options: {
     provider: string;
     timeoutMs: number;
+    timeoutCategory?: AITimeoutCategory;
     signal?: AbortSignal;
     retryPolicy?: RetryPolicy;
     sleepFn?: (ms: number, signal?: AbortSignal) => Promise<void>;
+    onRetry?: (info: { attempt: number; delayMs: number; error: AIProviderError }) => void;
   }
 ): Promise<T> {
   const policy = options.retryPolicy ?? DEFAULT_RETRY_POLICY;
   const sleep = options.sleepFn ?? sleepWithAbort;
+  const timeoutCategory = options.timeoutCategory ?? "overall-generation";
 
   let attempt = 0;
   while (true) {
     if (options.signal?.aborted) {
       throw new AIProviderError("CANCELLED", "AI request was cancelled.", {
         provider: options.provider,
-        retryable: false
+        retryable: false,
+        retryCount: attempt
       });
     }
 
     const linked = createLinkedAbortSignal(options.timeoutMs, options.signal);
     try {
-      const result = await operation(linked.signal);
+      const result = await operation(linked.signal, attempt);
       linked.cleanup();
       return result;
     } catch (rawError) {
@@ -140,22 +149,40 @@ export async function executeWithRetry<T>(
 
       const normalized =
         timedOut && !options.signal?.aborted
-          ? new AIProviderError("TIMEOUT", `AI request timed out after ${options.timeoutMs}ms.`, {
-              provider: options.provider,
-              retryable: true,
-              cause: rawError
-            })
+          ? new AIProviderError(
+              "TIMEOUT",
+              formatTimeoutMessage(timeoutCategory, options.timeoutMs),
+              {
+                provider: options.provider,
+                retryable: true,
+                timeoutCategory,
+                retryCount: attempt,
+                cause: rawError
+              }
+            )
           : normalizeProviderError(rawError, options.provider);
 
       const canRetry =
         normalized.retryable && !options.signal?.aborted && attempt < policy.maxRetries;
 
       if (!canRetry) {
-        throw normalized;
+        if (normalized.retryCount === attempt) {
+          throw normalized;
+        }
+        throw new AIProviderError(normalized.code, normalized.message, {
+          provider: normalized.provider ?? options.provider,
+          statusCode: normalized.statusCode,
+          retryable: normalized.retryable,
+          retryAfterMs: normalized.retryAfterMs,
+          timeoutCategory: normalized.timeoutCategory,
+          retryCount: attempt,
+          cause: normalized
+        });
       }
 
       const delayMs = computeBackoffDelayMs(attempt, policy, normalized.retryAfterMs);
       attempt += 1;
+      options.onRetry?.({ attempt, delayMs, error: normalized });
       await sleep(delayMs, options.signal);
     }
   }
