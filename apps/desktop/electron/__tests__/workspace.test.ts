@@ -317,4 +317,61 @@ describe("Phase 2 Workspace & Local Filesystem Engine", () => {
     expect(dirtyStatus.isDirty).toBe(true);
     expect(dirtyStatus.modifiedCount).toBeGreaterThan(0);
   });
+
+  it("indexes workspace through engine IPC, searches symbols, and incrementally updates on file save", async () => {
+    // Unauthorized workspace rejected by engine IPC
+    const unauthIndex = await ipcMain.invoke(IPC_CHANNELS.ENGINE_INDEX_WORKSPACE, {
+      workspaceRoot: outsideDir
+    });
+    expect(unauthIndex.ok).toBe(false);
+
+    const openRes = await ipcMain.invoke<{ rootPath: string }>(IPC_CHANNELS.WORKSPACE_OPEN, {
+      rootPath: workspaceDir
+    });
+    const rootPath = openRes.ok ? openRes.data.rootPath : workspaceDir;
+
+    const indexRes = await ipcMain.invoke<{ indexedFiles: number; totalSymbols: number }>(
+      IPC_CHANNELS.ENGINE_INDEX_WORKSPACE,
+      { workspaceRoot: rootPath }
+    );
+    expect(indexRes.ok).toBe(true);
+    if (indexRes.ok) {
+      expect(indexRes.data.indexedFiles).toBeGreaterThanOrEqual(2);
+      expect(indexRes.data.totalSymbols).toBeGreaterThanOrEqual(2);
+    }
+
+    const symRes = await ipcMain.invoke<{ symbol: { name: string; filePath: string } }[]>(
+      IPC_CHANNELS.ENGINE_SEARCH_SYMBOLS,
+      { workspaceRoot: rootPath, query: "Header" }
+    );
+    expect(symRes.ok).toBe(true);
+    if (symRes.ok) {
+      expect(symRes.data[0]?.symbol.name).toBe("Header");
+      expect(symRes.data[0]?.symbol.filePath).toBe("src/components/Header.tsx");
+    }
+
+    // Save a modified file via FILE_WRITE and confirm incremental index updates automatically
+    const readRes = await ipcMain.invoke<FileReadResult>(IPC_CHANNELS.FILE_READ, {
+      workspaceRoot: rootPath,
+      relativePath: "src/index.ts"
+    });
+    expect(readRes.ok).toBe(true);
+    if (!readRes.ok) return;
+
+    await ipcMain.invoke(IPC_CHANNELS.FILE_WRITE, {
+      workspaceRoot: rootPath,
+      relativePath: "src/index.ts",
+      content: 'export const greeting = "hello";\nexport function freshlyAddedFn() { return 1; }\n',
+      expectedContentHash: readRes.data.contentHash
+    });
+
+    const updatedSymRes = await ipcMain.invoke<{ symbol: { name: string } }[]>(
+      IPC_CHANNELS.ENGINE_SEARCH_SYMBOLS,
+      { workspaceRoot: rootPath, query: "freshlyAddedFn" }
+    );
+    expect(updatedSymRes.ok).toBe(true);
+    if (updatedSymRes.ok) {
+      expect(updatedSymRes.data.map((r) => r.symbol.name)).toContain("freshlyAddedFn");
+    }
+  });
 });

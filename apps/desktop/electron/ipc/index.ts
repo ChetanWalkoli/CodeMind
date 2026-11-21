@@ -1,6 +1,7 @@
 import { IPC_CHANNELS, type IpcResponse } from "@codemind/shared";
 import { APPROVED_IPC_CHANNELS, type ApprovedIpcChannel } from "./channels.js";
 import { createAppHandlers, type AppRuntimeMetadata } from "./handlers/app.handler.js";
+import { CodeEngineManager, createEngineHandlers } from "./handlers/engine.handler.js";
 import { createFileHandlers } from "./handlers/file.handler.js";
 import { createThemeHandlers } from "./handlers/theme.handler.js";
 import { createWorkspaceHandlers, type SelectFolderFn } from "./handlers/workspace.handler.js";
@@ -18,6 +19,7 @@ export interface IpcRegistrationDeps {
   preferences: PreferencesStore;
   authority?: WorkspaceAuthority;
   fileService?: WorkspaceFileService;
+  engineManager?: CodeEngineManager;
   selectFolder?: SelectFolderFn;
 }
 
@@ -54,6 +56,7 @@ function registerSafe(
 export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationDeps): void {
   const authority = deps.authority ?? new WorkspaceAuthority();
   const fileService = deps.fileService ?? new WorkspaceFileService(authority);
+  const engineManager = deps.engineManager ?? new CodeEngineManager();
   const selectFolder = deps.selectFolder ?? (async () => null);
 
   const appHandlers = createAppHandlers(deps.metadata);
@@ -63,7 +66,15 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     preferences: deps.preferences,
     selectFolder
   });
-  const fileHandlers = createFileHandlers(fileService);
+  const engineHandlers = createEngineHandlers({
+    authority,
+    preferences: deps.preferences,
+    engineManager
+  });
+  const fileHandlers = createFileHandlers(fileService, async (workspaceRoot, relativePath) => {
+    const realRoot = authority.getAuthorizedRoot(workspaceRoot);
+    await engineManager.notifyFileSaved(realRoot, relativePath);
+  });
 
   registerSafe(
     ipcMain,
@@ -135,6 +146,30 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     ipcMain,
     IPC_CHANNELS.WORKSPACE_GET_GIT_STATUS,
     wrapHandler((payload) => workspaceHandlers.getGitStatus(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ENGINE_INDEX_WORKSPACE,
+    wrapHandler((payload) => engineHandlers.indexWorkspace(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ENGINE_SEARCH_SYMBOLS,
+    wrapHandler((payload) => engineHandlers.searchSymbols(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ENGINE_GET_GRAPH,
+    wrapHandler((payload) => engineHandlers.getDependencyGraph(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ENGINE_GET_FILE_INTEL,
+    wrapHandler((payload) => engineHandlers.getFileIntelligence(payload))
   );
 
   registerSafe(

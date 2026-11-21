@@ -1,24 +1,23 @@
-import { DEFAULT_IGNORE_DIRS, SUPPORTED_EXTENSIONS } from "@codemind/config";
-import type { SupportedLanguage } from "@codemind/shared";
-
-/**
- * Detect supported language from a file path extension.
- * Full scanner, AST parser, symbol extractor, dependency graph, and impact modules
- * will be implemented in Phase 3 and Phase 8.
- */
-export function detectLanguage(filePath: string): SupportedLanguage {
-  const normalized = filePath.toLowerCase();
-  for (const [language, extensions] of Object.entries(SUPPORTED_EXTENSIONS)) {
-    if (extensions.some((ext) => normalized.endsWith(ext))) {
-      return language as SupportedLanguage;
-    }
-  }
-  return "unknown";
-}
-
-/**
- * Determine whether a directory segment should be excluded by default ignore rules.
- */
-export function isIgnoredDirectory(dirName: string): boolean {
-  return (DEFAULT_IGNORE_DIRS as readonly string[]).includes(dirName);
-}
+export { CodeEngineIgnore, isIgnoredDirectory, isSecretFilePath } from "./scanner/ignore.js";
+export {
+  computeHash,
+  detectLanguage,
+  isJsTsLanguage,
+  scanSingleFile,
+  scanWorkspaceFiles,
+  type ScannedFile,
+  type ScanOptions
+} from "./scanner/scanner.js";
+export { parseJsTsSource, type ParsedSourceFile } from "./parsers/tsParser.js";
+export {
+  extractSymbolsAndExports,
+  type SymbolExtractionResult
+} from "./symbols/symbolExtractor.js";
+export { extractImports, resolveRelativeSpecifier } from "./imports/importExtractor.js";
+export { DependencyGraph } from "./graph/dependencyGraph.js";
+export { SearchIndex, type SymbolSearchOptions } from "./search/searchIndex.js";
+export {
+  ProjectIndexer,
+  type IncrementalSyncResult,
+  type IndexedFileEntry
+} from "./indexer/projectIndexer.js";

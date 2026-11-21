@@ -26,7 +26,10 @@ function toErrorResponse<T>(err: unknown, fallbackCode: string): IpcResponse<T> 
   };
 }
 
-export function createFileHandlers(fileService: WorkspaceFileService) {
+export function createFileHandlers(
+  fileService: WorkspaceFileService,
+  onFileSaved?: (workspaceRoot: string, relativePath: string) => Promise<void>
+) {
   return {
     async readFile(payload: unknown): Promise<IpcResponse<FileReadResult>> {
       const parsed = FileReadRequestSchema.safeParse(payload);
@@ -71,6 +74,9 @@ export function createFileHandlers(fileService: WorkspaceFileService) {
           parsed.data.expectedContentHash,
           parsed.data.force ?? false
         );
+        if (onFileSaved) {
+          await onFileSaved(parsed.data.workspaceRoot, result.relativePath);
+        }
         return { ok: true, data: FileWriteResultSchema.parse(result) };
       } catch (err) {
         return toErrorResponse(err, "FILE_WRITE_FAILED");

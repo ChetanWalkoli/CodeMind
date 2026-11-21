@@ -1,4 +1,23 @@
 import { z } from "zod";
+import {
+  CodeSymbolSchema,
+  DependencyEdgeSchema,
+  DependencyGraphSnapshotSchema,
+  ExportRecordSchema,
+  ImportRecordSchema,
+  IndexSummarySchema,
+  ParseDiagnosticSchema,
+  SymbolKindSchema,
+  SymbolSearchResultSchema,
+  type CodeSymbol,
+  type DependencyEdge,
+  type DependencyGraphSnapshot,
+  type ExportRecord,
+  type ImportRecord,
+  type IndexSummary,
+  type ParseDiagnostic,
+  type SymbolSearchResult
+} from "./code-engine.schema.js";
 
 export const IPC_CHANNELS = {
   WORKSPACE_SELECT_FOLDER: "workspace:select-folder",
@@ -8,6 +27,10 @@ export const IPC_CHANNELS = {
   WORKSPACE_GET_TREE: "workspace:get-tree",
   WORKSPACE_SEARCH_FILES: "workspace:search-files",
   WORKSPACE_GET_GIT_STATUS: "workspace:get-git-status",
+  ENGINE_INDEX_WORKSPACE: "engine:index-workspace",
+  ENGINE_SEARCH_SYMBOLS: "engine:search-symbols",
+  ENGINE_GET_GRAPH: "engine:get-graph",
+  ENGINE_GET_FILE_INTEL: "engine:get-file-intel",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -213,6 +236,57 @@ export type IpcError = z.infer<typeof IpcErrorSchema>;
 
 export type IpcResponse<T> = { ok: true; data: T } | { ok: false; error: IpcError };
 
+export const EngineIndexRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  incremental: z.boolean().optional(),
+  customExcludes: z.array(z.string()).optional()
+});
+
+export type EngineIndexRequest = z.infer<typeof EngineIndexRequestSchema>;
+
+export const EngineSearchSymbolsRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  query: z.string().min(1),
+  kind: SymbolKindSchema.optional(),
+  exportedOnly: z.boolean().optional(),
+  limit: z.number().int().positive().max(200).optional()
+});
+
+export type EngineSearchSymbolsRequest = z.infer<typeof EngineSearchSymbolsRequestSchema>;
+
+export const EngineGraphRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+
+export type EngineGraphRequest = z.infer<typeof EngineGraphRequestSchema>;
+
+export const EngineFileIntelRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  relativePath: z.string().min(1)
+});
+
+export type EngineFileIntelRequest = z.infer<typeof EngineFileIntelRequestSchema>;
+
+export const FileIntelligenceSchema = z.object({
+  filePath: z.string().min(1),
+  symbols: z.array(CodeSymbolSchema),
+  imports: z.array(ImportRecordSchema),
+  exports: z.array(ExportRecordSchema),
+  dependencies: z.array(DependencyEdgeSchema),
+  dependents: z.array(DependencyEdgeSchema),
+  diagnostics: z.array(ParseDiagnosticSchema)
+});
+
+export type FileIntelligence = {
+  filePath: string;
+  symbols: CodeSymbol[];
+  imports: ImportRecord[];
+  exports: ExportRecord[];
+  dependencies: DependencyEdge[];
+  dependents: DependencyEdge[];
+  diagnostics: ParseDiagnostic[];
+};
+
 export interface CodeMindDesktopAPI {
   getAppInfo(): Promise<IpcResponse<AppInfo>>;
   getPlatformInfo(): Promise<IpcResponse<PlatformInfo>>;
@@ -226,7 +300,13 @@ export interface CodeMindDesktopAPI {
   getWorkspaceTree(request: WorkspaceTreeRequest): Promise<IpcResponse<FileTreeNode[]>>;
   searchWorkspaceFiles(request: WorkspaceSearchRequest): Promise<IpcResponse<FileSearchMatch[]>>;
   getGitStatus(request: GitStatusRequest): Promise<IpcResponse<GitStatus>>;
+  indexWorkspace(request: EngineIndexRequest): Promise<IpcResponse<IndexSummary>>;
+  searchSymbols(request: EngineSearchSymbolsRequest): Promise<IpcResponse<SymbolSearchResult[]>>;
+  getDependencyGraph(request: EngineGraphRequest): Promise<IpcResponse<DependencyGraphSnapshot>>;
+  getFileIntelligence(request: EngineFileIntelRequest): Promise<IpcResponse<FileIntelligence>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;
 }
+
+export { IndexSummarySchema, DependencyGraphSnapshotSchema, SymbolSearchResultSchema };

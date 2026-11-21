@@ -66,3 +66,69 @@ export const DependencyEdgeSchema = z.object({
 });
 
 export type DependencyEdge = z.infer<typeof DependencyEdgeSchema>;
+
+export const ImportKindSchema = z.enum(["static-import", "re-export", "require", "dynamic-import"]);
+
+export type ImportKind = z.infer<typeof ImportKindSchema>;
+
+export const ImportRecordSchema = z.object({
+  sourcePath: z.string().min(1),
+  specifier: z.string().min(1),
+  resolvedPath: z.string().nullable(),
+  isExternal: z.boolean(),
+  kind: ImportKindSchema,
+  importedNames: z.array(z.string()),
+  line: z.number().int().positive(),
+  confidence: RelationshipConfidenceSchema
+});
+
+export type ImportRecord = z.infer<typeof ImportRecordSchema>;
+
+export const ExportKindSchema = z.enum(["named", "default", "re-export", "namespace"]);
+export type ExportKind = z.infer<typeof ExportKindSchema>;
+
+export const ExportRecordSchema = z.object({
+  filePath: z.string().min(1),
+  name: z.string().min(1),
+  kind: ExportKindSchema,
+  line: z.number().int().positive()
+});
+
+export type ExportRecord = z.infer<typeof ExportRecordSchema>;
+
+export const ParseDiagnosticSchema = z.object({
+  filePath: z.string().min(1),
+  message: z.string().min(1),
+  line: z.number().int().positive(),
+  column: z.number().int().positive(),
+  severity: z.enum(["error", "warning"])
+});
+
+export type ParseDiagnostic = z.infer<typeof ParseDiagnosticSchema>;
+
+export const IndexSummarySchema = z.object({
+  workspaceRoot: z.string().min(1),
+  totalFiles: z.number().int().nonnegative(),
+  indexedFiles: z.number().int().nonnegative(),
+  totalSymbols: z.number().int().nonnegative(),
+  totalEdges: z.number().int().nonnegative(),
+  diagnosticCount: z.number().int().nonnegative(),
+  durationMs: z.number().nonnegative(),
+  indexedAt: z.string().datetime()
+});
+
+export type IndexSummary = z.infer<typeof IndexSummarySchema>;
+
+export const DependencyGraphSnapshotSchema = z.object({
+  nodes: z.array(FileNodeSchema),
+  edges: z.array(DependencyEdgeSchema)
+});
+
+export type DependencyGraphSnapshot = z.infer<typeof DependencyGraphSnapshotSchema>;
+
+export const SymbolSearchResultSchema = z.object({
+  symbol: CodeSymbolSchema,
+  score: z.number().nonnegative()
+});
+
+export type SymbolSearchResult = z.infer<typeof SymbolSearchResultSchema>;

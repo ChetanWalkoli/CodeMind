@@ -19,6 +19,7 @@
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('dist-electron',{recursive:true,force:true}); fs.rmSync('release',{recursive:true,force:true});\""
   },
   "dependencies": {
+    "@codemind/code-engine": "workspace:*",
     "@codemind/config": "workspace:*",
     "@codemind/shared": "workspace:*",
     "@monaco-editor/react": "^4.7.0",

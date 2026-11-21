@@ -12,6 +12,8 @@ export function StatusBar() {
   const isElectron = useWorkspaceStore((s) => s.isElectron);
   const bridgeStatus = useWorkspaceStore((s) => s.bridgeStatus);
   const gitStatus = useWorkspaceStore((s) => s.gitStatus);
+  const isIndexing = useWorkspaceStore((s) => s.isIndexing);
+  const indexSummary = useWorkspaceStore((s) => s.indexSummary);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
 
@@ -50,6 +52,14 @@ export function StatusBar() {
               {gitStatus.branch ?? "HEAD"} ·{" "}
               {gitStatus.isDirty ? `Modified (${gitStatus.modifiedCount})` : "Clean"}
             </span>
+          </span>
+        )}
+
+        {(isIndexing || indexSummary) && (
+          <span className={styles.item} data-testid="status-index">
+            {isIndexing
+              ? "Indexing..."
+              : `Index: ${indexSummary!.indexedFiles} files · ${indexSummary!.totalSymbols} symbols`}
           </span>
         )}
 

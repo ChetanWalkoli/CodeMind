@@ -1,7 +1,7 @@
 import { IPC_CHANNELS } from "@codemind/shared";
 
 /**
- * Explicitly allowlisted IPC channels for CodeMind (Phase 1 + Phase 2).
+ * Explicitly allowlisted IPC channels for CodeMind (Phases 1–3).
  * Unrestricted filesystem or arbitrary shell execution channels are never permitted.
  */
 export const APPROVED_IPC_CHANNELS = [
@@ -17,6 +17,10 @@ export const APPROVED_IPC_CHANNELS = [
   IPC_CHANNELS.WORKSPACE_GET_TREE,
   IPC_CHANNELS.WORKSPACE_SEARCH_FILES,
   IPC_CHANNELS.WORKSPACE_GET_GIT_STATUS,
+  IPC_CHANNELS.ENGINE_INDEX_WORKSPACE,
+  IPC_CHANNELS.ENGINE_SEARCH_SYMBOLS,
+  IPC_CHANNELS.ENGINE_GET_GRAPH,
+  IPC_CHANNELS.ENGINE_GET_FILE_INTEL,
   IPC_CHANNELS.FILE_READ,
   IPC_CHANNELS.FILE_WRITE,
   IPC_CHANNELS.FILE_STAT

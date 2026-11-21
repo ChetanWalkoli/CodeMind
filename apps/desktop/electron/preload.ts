@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   IPC_CHANNELS,
   type CodeMindDesktopAPI,
+  type EngineFileIntelRequest,
+  type EngineGraphRequest,
+  type EngineIndexRequest,
+  type EngineSearchSymbolsRequest,
   type FileReadRequest,
   type FileStatRequest,
   type FileWriteRequest,
@@ -36,6 +40,14 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
     ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SEARCH_FILES, request),
   getGitStatus: (request: GitStatusRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_GIT_STATUS, request),
+  indexWorkspace: (request: EngineIndexRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENGINE_INDEX_WORKSPACE, request),
+  searchSymbols: (request: EngineSearchSymbolsRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENGINE_SEARCH_SYMBOLS, request),
+  getDependencyGraph: (request: EngineGraphRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENGINE_GET_GRAPH, request),
+  getFileIntelligence: (request: EngineFileIntelRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ENGINE_GET_FILE_INTEL, request),
   readFile: (request: FileReadRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_READ, request),
   writeFile: (request: FileWriteRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_WRITE, request),
   statFile: (request: FileStatRequest) => ipcRenderer.invoke(IPC_CHANNELS.FILE_STAT, request)

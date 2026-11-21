@@ -43,6 +43,33 @@ function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMind
       ok: true,
       data: { isGitRepo: false, branch: null, isDirty: false, modifiedCount: 0 }
     }),
+    indexWorkspace: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        workspaceRoot: "C:\\demo",
+        totalFiles: 0,
+        indexedFiles: 0,
+        totalSymbols: 0,
+        totalEdges: 0,
+        diagnosticCount: 0,
+        durationMs: 1,
+        indexedAt: new Date().toISOString()
+      }
+    }),
+    searchSymbols: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    getDependencyGraph: vi.fn().mockResolvedValue({ ok: true, data: { nodes: [], edges: [] } }),
+    getFileIntelligence: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        filePath: "index.ts",
+        symbols: [],
+        imports: [],
+        exports: [],
+        dependencies: [],
+        dependents: [],
+        diagnostics: []
+      }
+    }),
     readFile: vi.fn().mockResolvedValue({
       ok: true,
       data: {

@@ -119,6 +119,33 @@ describe("Phase 2 Workspace UI Integration", () => {
         ok: true,
         data: { isGitRepo: true, branch: "main", isDirty: false, modifiedCount: 0 }
       }),
+      indexWorkspace: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          workspaceRoot: "C:\\projects\\demo",
+          totalFiles: 1,
+          indexedFiles: 1,
+          totalSymbols: 1,
+          totalEdges: 0,
+          diagnosticCount: 0,
+          durationMs: 2,
+          indexedAt: new Date().toISOString()
+        }
+      }),
+      searchSymbols: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      getDependencyGraph: vi.fn().mockResolvedValue({ ok: true, data: { nodes: [], edges: [] } }),
+      getFileIntelligence: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          filePath: "src/app.ts",
+          symbols: [],
+          imports: [],
+          exports: [],
+          dependencies: [],
+          dependents: [],
+          diagnostics: []
+        }
+      }),
       readFile: vi.fn().mockResolvedValue({
         ok: true,
         data: {
@@ -259,6 +286,33 @@ describe("Phase 2 Workspace UI Integration", () => {
       getGitStatus: vi.fn().mockResolvedValue({
         ok: true,
         data: { isGitRepo: false, branch: null, isDirty: false, modifiedCount: 0 }
+      }),
+      indexWorkspace: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          workspaceRoot: "C:\\projects\\demo",
+          totalFiles: 1,
+          indexedFiles: 1,
+          totalSymbols: 1,
+          totalEdges: 0,
+          diagnosticCount: 0,
+          durationMs: 2,
+          indexedAt: new Date().toISOString()
+        }
+      }),
+      searchSymbols: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      getDependencyGraph: vi.fn().mockResolvedValue({ ok: true, data: { nodes: [], edges: [] } }),
+      getFileIntelligence: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          filePath: "src/app.ts",
+          symbols: [],
+          imports: [],
+          exports: [],
+          dependencies: [],
+          dependents: [],
+          diagnostics: []
+        }
       }),
       readFile: readFileMock,
       writeFile: vi.fn().mockResolvedValue({

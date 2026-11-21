@@ -3,6 +3,7 @@ import type {
   AppInfo,
   FileTreeNode,
   GitStatus,
+  IndexSummary,
   PlatformInfo,
   WorkspaceInfo,
   WorkspaceSession
@@ -32,6 +33,8 @@ interface WorkspaceState {
   expandedPaths: Record<string, boolean>;
   loadingPaths: Record<string, boolean>;
   isTreeLoading: boolean;
+  isIndexing: boolean;
+  indexSummary: IndexSummary | null;
   gitStatus: GitStatus | null;
   customExcludes: string[];
   workspaceError: string | null;
@@ -48,6 +51,7 @@ interface WorkspaceState {
   restoreLastWorkspace: () => Promise<void>;
   toggleDirectory: (relativePath: string) => Promise<void>;
   refreshWorkspace: () => Promise<void>;
+  refreshIndex: (incremental?: boolean) => Promise<void>;
   refreshGitStatus: () => Promise<void>;
   setCustomExcludes: (patterns: string[]) => Promise<void>;
   persistSession: () => Promise<void>;
@@ -68,6 +72,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   expandedPaths: {},
   loadingPaths: {},
   isTreeLoading: false,
+  isIndexing: false,
+  indexSummary: null,
   gitStatus: null,
   customExcludes: [],
   workspaceError: null,
@@ -167,6 +173,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     await get().persistSession();
+    void get().refreshIndex(false);
     return true;
   },
 
@@ -277,6 +284,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       childrenByPath: nextChildren,
       gitStatus: gitRes.ok ? gitRes.data : get().gitStatus,
       isTreeLoading: false
+    });
+  },
+
+  async refreshIndex(incremental = true) {
+    const workspace = get().workspace;
+    if (!workspace) return;
+    set({ isIndexing: true });
+    const res = await desktopApi.indexWorkspace({
+      workspaceRoot: workspace.rootPath,
+      incremental,
+      customExcludes: get().customExcludes
+    });
+    set({
+      isIndexing: false,
+      indexSummary: res.ok ? res.data : get().indexSummary
     });
   },
 

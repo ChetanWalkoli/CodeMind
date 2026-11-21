@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@codemind/config": "workspace:*",
-    "@codemind/shared": "workspace:*"
+    "@codemind/shared": "workspace:*",
+    "graphology": "^0.26.0",
+    "typescript": "^5.8.2"
   }
 }

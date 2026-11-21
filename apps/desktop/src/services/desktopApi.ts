@@ -3,6 +3,12 @@ import {
   WorkspaceSessionSchema,
   type AppInfo,
   type CodeMindDesktopAPI,
+  type DependencyGraphSnapshot,
+  type EngineFileIntelRequest,
+  type EngineGraphRequest,
+  type EngineIndexRequest,
+  type EngineSearchSymbolsRequest,
+  type FileIntelligence,
   type FileReadRequest,
   type FileReadResult,
   type FileSearchMatch,
@@ -14,8 +20,10 @@ import {
   type GitStatus,
   type GitStatusRequest,
   type HealthCheckResponse,
+  type IndexSummary,
   type IpcResponse,
   type PlatformInfo,
+  type SymbolSearchResult,
   type ThemePreference,
   type WorkspaceInfo,
   type WorkspaceOpenRequest,
@@ -278,6 +286,67 @@ export const desktopApi = {
       };
     }
     return safeInvoke(() => bridge.getGitStatus(request), "BRIDGE_GIT_STATUS_FAILED");
+  },
+
+  async indexWorkspace(request: EngineIndexRequest): Promise<IpcResponse<IndexSummary>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          workspaceRoot: request.workspaceRoot,
+          totalFiles: 0,
+          indexedFiles: 0,
+          totalSymbols: 0,
+          totalEdges: 0,
+          diagnosticCount: 0,
+          durationMs: 0,
+          indexedAt: new Date().toISOString()
+        }
+      };
+    }
+    return safeInvoke(() => bridge.indexWorkspace(request), "BRIDGE_ENGINE_INDEX_FAILED");
+  },
+
+  async searchSymbols(
+    request: EngineSearchSymbolsRequest
+  ): Promise<IpcResponse<SymbolSearchResult[]>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: [] };
+    }
+    return safeInvoke(() => bridge.searchSymbols(request), "BRIDGE_ENGINE_SEARCH_SYMBOLS_FAILED");
+  },
+
+  async getDependencyGraph(
+    request: EngineGraphRequest
+  ): Promise<IpcResponse<DependencyGraphSnapshot>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: { nodes: [], edges: [] } };
+    }
+    return safeInvoke(() => bridge.getDependencyGraph(request), "BRIDGE_ENGINE_GRAPH_FAILED");
+  },
+
+  async getFileIntelligence(
+    request: EngineFileIntelRequest
+  ): Promise<IpcResponse<FileIntelligence>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          filePath: request.relativePath,
+          symbols: [],
+          imports: [],
+          exports: [],
+          dependencies: [],
+          dependents: [],
+          diagnostics: []
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getFileIntelligence(request), "BRIDGE_ENGINE_FILE_INTEL_FAILED");
   },
 
   async readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>> {
