@@ -1,9 +1,35 @@
 import {
   ThemePreferenceSchema,
   WorkspaceSessionSchema,
+  type AIClearKeyRequest,
+  type AIConfigStatus,
+  type AIContextApprovalRecord,
+  type AIContextApprovalRequest,
+  type AIContextBuildRequest,
+  type AIContextGetApprovalRequest,
+  type AIContextSnapshot,
+  type AIConversationCreateRequest,
+  type AIConversationDeleteRequest,
+  type AIConversationGetRequest,
+  type AIConversationListRequest,
+  type AIConversationRenameRequest,
+  type AIExecuteApprovedRequest,
+  type AIExecuteApprovedResult,
+  type AIStreamCancelRequest,
+  type AIStreamCancelResponse,
+  type AIStreamIpcEvent,
+  type AIStreamStartRequest,
+  type AIStreamStartResponse,
+  type AISetKeyRequest,
+  type AISetModelRequest,
+  type AIUsageSummary,
+  type AIValidateKeyRequest,
+  type AIValidateKeyResult,
   type AppInfo,
   type ArchitectureOverview,
   type CodeMindDesktopAPI,
+  type ConversationPage,
+  type ConversationSummary,
   type DependencyGraphSnapshot,
   type EngineFileIntelRequest,
   type EngineGraphRequest,
@@ -411,5 +437,318 @@ export const desktopApi = {
       return { ok: true, data: { exists: false } };
     }
     return safeInvoke(() => bridge.statFile(request), "BRIDGE_FILE_STAT_FAILED");
+  },
+
+  async getAIConfig(): Promise<IpcResponse<AIConfigStatus>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          provider: "gemini",
+          model: "gemini-3.8-flash",
+          availableModels: [
+            {
+              id: "gemini-3.8-flash",
+              displayName: "Gemini 3.8 Flash",
+              contextWindowTokens: 1_048_576,
+              maxOutputTokens: 65_536,
+              freeTierAvailable: true,
+              lifecycleStatus: "active"
+            },
+            {
+              id: "gemini-3.6-flash",
+              displayName: "Gemini 3.6 Flash",
+              contextWindowTokens: 1_048_576,
+              maxOutputTokens: 65_536,
+              freeTierAvailable: true,
+              lifecycleStatus: "active"
+            },
+            {
+              id: "gemini-3.1-flash-lite",
+              displayName: "Gemini 3.1 Flash-Lite",
+              contextWindowTokens: 1_048_576,
+              maxOutputTokens: 65_536,
+              freeTierAvailable: true,
+              lifecycleStatus: "active"
+            }
+          ],
+          hasApiKey: false,
+          maskedKeyHint: null,
+          encryptionAvailable: false,
+          credentialCorrupt: false,
+          statusError: null
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getAIConfig(), "BRIDGE_AI_CONFIG_GET_FAILED");
+  },
+
+  async setAIApiKey(request: AISetKeyRequest): Promise<IpcResponse<AIConfigStatus>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Secure API key storage requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.setAIApiKey(request), "BRIDGE_AI_KEY_SET_FAILED");
+  },
+
+  async clearAIApiKey(request?: AIClearKeyRequest): Promise<IpcResponse<AIConfigStatus>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Managing stored API keys requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.clearAIApiKey(request), "BRIDGE_AI_KEY_CLEAR_FAILED");
+  },
+
+  async setAIModel(request: AISetModelRequest): Promise<IpcResponse<AIConfigStatus>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Updating AI model settings requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.setAIModel(request), "BRIDGE_AI_MODEL_SET_FAILED");
+  },
+
+  async validateAIApiKey(
+    request?: AIValidateKeyRequest
+  ): Promise<IpcResponse<AIValidateKeyResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Validating API keys requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.validateAIApiKey(request), "BRIDGE_AI_KEY_VALIDATE_FAILED");
+  },
+
+  async buildAIContext(request: AIContextBuildRequest): Promise<IpcResponse<AIContextSnapshot>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Building local codebase context requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.buildAIContext(request), "BRIDGE_AI_CONTEXT_BUILD_FAILED");
+  },
+
+  async approveAIContext(
+    request: AIContextApprovalRequest
+  ): Promise<IpcResponse<AIContextApprovalRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Approving codebase context requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.approveAIContext(request), "BRIDGE_AI_CONTEXT_APPROVE_FAILED");
+  },
+
+  async getAIContextApproval(
+    request: AIContextGetApprovalRequest
+  ): Promise<IpcResponse<AIContextApprovalRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          snapshotId: request.snapshotId,
+          approved: false,
+          approvedAt: null,
+          expiresAt: null
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.getAIContextApproval(request),
+      "BRIDGE_AI_CONTEXT_APPROVAL_GET_FAILED"
+    );
+  },
+
+  async executeApprovedAIContext(
+    request: AIExecuteApprovedRequest
+  ): Promise<IpcResponse<AIExecuteApprovedResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Transmitting approved AI context requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.executeApprovedAIContext(request),
+      "BRIDGE_AI_EXECUTE_APPROVED_FAILED"
+    );
+  },
+
+  async startAIStream(request: AIStreamStartRequest): Promise<IpcResponse<AIStreamStartResponse>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Streaming AI responses requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.startAIStream(request), "BRIDGE_AI_STREAM_START_FAILED");
+  },
+
+  async cancelAIStream(
+    request: AIStreamCancelRequest
+  ): Promise<IpcResponse<AIStreamCancelResponse>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: { requestId: request.requestId, cancelled: false } };
+    }
+    return safeInvoke(() => bridge.cancelAIStream(request), "BRIDGE_AI_STREAM_CANCEL_FAILED");
+  },
+
+  onAIStreamEvent(requestId: string, listener: (event: AIStreamIpcEvent) => void): () => void {
+    const bridge = getBridge();
+    if (!bridge) {
+      return () => undefined;
+    }
+    return bridge.onAIStreamEvent(requestId, listener);
+  },
+
+  async createAIConversation(
+    request: AIConversationCreateRequest
+  ): Promise<IpcResponse<ConversationSummary>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Managing conversations requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.createAIConversation(request),
+      "BRIDGE_AI_CONVERSATION_CREATE_FAILED"
+    );
+  },
+
+  async listAIConversations(
+    request: AIConversationListRequest
+  ): Promise<IpcResponse<ConversationSummary[]>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: [] };
+    }
+    return safeInvoke(
+      () => bridge.listAIConversations(request),
+      "BRIDGE_AI_CONVERSATION_LIST_FAILED"
+    );
+  },
+
+  async getAIConversation(
+    request: AIConversationGetRequest
+  ): Promise<IpcResponse<ConversationPage>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Loading conversation history requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getAIConversation(request), "BRIDGE_AI_CONVERSATION_GET_FAILED");
+  },
+
+  async renameAIConversation(
+    request: AIConversationRenameRequest
+  ): Promise<IpcResponse<ConversationSummary>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Renaming conversations requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.renameAIConversation(request),
+      "BRIDGE_AI_CONVERSATION_RENAME_FAILED"
+    );
+  },
+
+  async deleteAIConversation(
+    request: AIConversationDeleteRequest
+  ): Promise<IpcResponse<{ deleted: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Deleting conversations requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.deleteAIConversation(request),
+      "BRIDGE_AI_CONVERSATION_DELETE_FAILED"
+    );
+  },
+
+  async getAIUsageSummary(): Promise<IpcResponse<AIUsageSummary>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          totalRequests: 0,
+          succeededRequests: 0,
+          failedRequests: 0,
+          cancelledRequests: 0,
+          providerReportedInputTokens: 0,
+          providerReportedOutputTokens: 0,
+          estimatedInputTokens: 0,
+          averageDurationMs: 0,
+          estimatedCostUsd: null,
+          recentRequests: []
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getAIUsageSummary(), "BRIDGE_AI_USAGE_GET_FAILED");
   }
 };

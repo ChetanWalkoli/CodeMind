@@ -6,3 +6,4 @@ allowBuilds:
   esbuild: true
   electron: true
   "@parcel/watcher": true
+  protobufjs: false

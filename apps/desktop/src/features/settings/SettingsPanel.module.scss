@@ -132,3 +132,88 @@
     color: var(--text-primary);
   }
 }
+
+.select {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.aiActions {
+  display: flex;
+  gap: 6px;
+}
+
+.secondaryBtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: transparent;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+
+  &:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.dangerBtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: transparent;
+  color: var(--status-error, #f87171);
+  font-size: 11px;
+  font-weight: 500;
+
+  &:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.aiStatusBadge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.aiStatusConfigured {
+  color: var(--status-success, #4ade80);
+}
+
+.aiNotice {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-subtle);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.aiNoticeError {
+  border-color: var(--status-error, #f87171);
+  color: var(--status-error, #f87171);
+}
+
+.aiNoticeSuccess {
+  border-color: var(--status-success, #4ade80);
+  color: var(--status-success, #4ade80);
+}

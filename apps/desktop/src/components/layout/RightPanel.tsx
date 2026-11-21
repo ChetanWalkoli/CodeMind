@@ -1,4 +1,5 @@
 import { Sparkles, X } from "lucide-react";
+import { ContextPreviewPanel } from "../../features/ai/ContextPreviewPanel";
 import { useLayoutStore } from "../../stores/layout.store";
 import styles from "./RightPanel.module.scss";
 
@@ -34,15 +35,8 @@ export function RightPanel() {
         </button>
       </div>
 
-      <div className={styles.body}>
-        <span className={styles.iconBadge} aria-hidden="true">
-          <Sparkles size={18} />
-        </span>
-        <h3 className={styles.heading}>Codebase-Aware Assistant</h3>
-        <p className={styles.description}>
-          Project-grounded explanations, architectural Q&amp;A, and reviewed patch suggestions will
-          be enabled in a later phase once local code indexing is active.
-        </p>
+      <div className={styles.content}>
+        <ContextPreviewPanel />
       </div>
     </aside>
   );

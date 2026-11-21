@@ -101,6 +101,113 @@ function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMind
       data: { relativePath: "index.ts", contentHash: "hash2", modifiedAtMs: 1, sizeBytes: 1 }
     }),
     statFile: vi.fn().mockResolvedValue({ ok: true, data: { exists: false } }),
+    getAIConfig: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        provider: "gemini",
+        model: "gemini-3.8-flash",
+        availableModels: [{ id: "gemini-3.8-flash", displayName: "Gemini 2.5 Flash" }],
+        hasApiKey: false,
+        maskedKeyHint: null,
+        encryptionAvailable: true,
+        credentialCorrupt: false,
+        statusError: null
+      }
+    }),
+    setAIApiKey: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        provider: "gemini",
+        model: "gemini-3.8-flash",
+        availableModels: [{ id: "gemini-3.8-flash", displayName: "Gemini 2.5 Flash" }],
+        hasApiKey: true,
+        maskedKeyHint: "AIza...1234",
+        encryptionAvailable: true,
+        credentialCorrupt: false,
+        statusError: null
+      }
+    }),
+    clearAIApiKey: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        provider: "gemini",
+        model: "gemini-3.8-flash",
+        availableModels: [{ id: "gemini-3.8-flash", displayName: "Gemini 2.5 Flash" }],
+        hasApiKey: false,
+        maskedKeyHint: null,
+        encryptionAvailable: true,
+        credentialCorrupt: false,
+        statusError: null
+      }
+    }),
+    setAIModel: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        provider: "gemini",
+        model: "gemini-2.5-pro",
+        availableModels: [{ id: "gemini-3.8-flash", displayName: "Gemini 2.5 Flash" }],
+        hasApiKey: false,
+        maskedKeyHint: null,
+        encryptionAvailable: true,
+        credentialCorrupt: false,
+        statusError: null
+      }
+    }),
+    validateAIApiKey: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        valid: true,
+        status: "valid",
+        message: "Google Gemini API key verified successfully."
+      }
+    }),
+    buildAIContext: vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: "NOOP", message: "noop" }
+    }),
+    approveAIContext: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { snapshotId: "snap", approved: true, approvedAt: null, expiresAt: null }
+    }),
+    getAIContextApproval: vi.fn().mockResolvedValue({
+      ok: true,
+      data: { snapshotId: "snap", approved: false, approvedAt: null, expiresAt: null }
+    }),
+    executeApprovedAIContext: vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: "NOOP", message: "noop" }
+    }),
+    startAIStream: vi.fn().mockResolvedValue({ ok: true, data: { requestId: "req-1" } }),
+    cancelAIStream: vi
+      .fn()
+      .mockResolvedValue({ ok: true, data: { requestId: "req-1", cancelled: true } }),
+    onAIStreamEvent: vi.fn().mockReturnValue(() => undefined),
+    createAIConversation: vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+    listAIConversations: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+    getAIConversation: vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+    renameAIConversation: vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+    deleteAIConversation: vi.fn().mockResolvedValue({ ok: true, data: { deleted: true } }),
+    getAIUsageSummary: vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        totalRequests: 0,
+        succeededRequests: 0,
+        failedRequests: 0,
+        cancelledRequests: 0,
+        providerReportedInputTokens: 0,
+        providerReportedOutputTokens: 0,
+        estimatedInputTokens: 0,
+        averageDurationMs: 0,
+        estimatedCostUsd: null,
+        recentRequests: []
+      }
+    }),
     ...overrides
   };
 }
@@ -125,6 +232,20 @@ describe("desktopApi service", () => {
 
     const getRes = await desktopApi.getTheme();
     expect(getRes).toEqual({ ok: true, data: "light" });
+
+    // Browser fallback must report Gemini with encryptionAvailable=false and refuse saving keys
+    const aiCfg = await desktopApi.getAIConfig();
+    expect(aiCfg.ok).toBe(true);
+    if (aiCfg.ok) {
+      expect(aiCfg.data.provider).toBe("gemini");
+      expect(aiCfg.data.encryptionAvailable).toBe(false);
+    }
+    const saveKeyRes = await desktopApi.setAIApiKey({
+      provider: "gemini",
+      apiKey: "AIzaSyBrowserShouldReject123456"
+    });
+    expect(saveKeyRes.ok).toBe(false);
+    expect(window.localStorage.length).toBe(1); // Only theme, never API key
   });
 
   it("delegates to window.codemindDesktop when inside Electron and catches bridge rejections", async () => {

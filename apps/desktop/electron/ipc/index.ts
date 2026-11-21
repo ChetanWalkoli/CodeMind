@@ -1,13 +1,35 @@
+import os from "node:os";
 import { IPC_CHANNELS, type IpcResponse } from "@codemind/shared";
 import { APPROVED_IPC_CHANNELS, type ApprovedIpcChannel } from "./channels.js";
+import { createAIConfigHandlers, type KeyValidatorFn } from "./handlers/aiConfig.handler.js";
+import { createAIContextHandlers } from "./handlers/aiContext.handler.js";
+import { createAIStreamAndConversationHandlers } from "./handlers/aiConversation.handler.js";
 import { createAppHandlers, type AppRuntimeMetadata } from "./handlers/app.handler.js";
 import { CodeEngineManager, createEngineHandlers } from "./handlers/engine.handler.js";
 import { createFileHandlers } from "./handlers/file.handler.js";
 import { createThemeHandlers } from "./handlers/theme.handler.js";
 import { createWorkspaceHandlers, type SelectFolderFn } from "./handlers/workspace.handler.js";
+import { ContextApprovalStore } from "../ai/contextApprovalStore.js";
+import { WorkspaceContextBuilder } from "../ai/contextBuilder.js";
+import { ConversationStore } from "../ai/conversationStore.js";
+import { CredentialStore, type SafeStorageAdapter } from "../ai/credentialStore.js";
+import { AIProviderManager } from "../ai/providerManager.js";
+import { AIStreamManager, type StreamEventEmitter } from "../ai/streamManager.js";
+import { SecureTransmissionGate } from "../ai/transmissionGate.js";
+import { AIUsageStore } from "../ai/usageStore.js";
 import type { PreferencesStore } from "../utils/preferences.js";
 import { WorkspaceFileService } from "../workspace/filesystem.js";
 import { WorkspaceAuthority } from "../workspace/pathSecurity.js";
+
+const UNAVAILABLE_SAFE_STORAGE: SafeStorageAdapter = {
+  isEncryptionAvailable: () => false,
+  encryptString: () => {
+    throw new Error("OS encryption is unavailable.");
+  },
+  decryptString: () => {
+    throw new Error("OS encryption is unavailable.");
+  }
+};
 
 export interface IpcMainLike {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void;
@@ -21,6 +43,14 @@ export interface IpcRegistrationDeps {
   fileService?: WorkspaceFileService;
   engineManager?: CodeEngineManager;
   selectFolder?: SelectFolderFn;
+  credentials?: CredentialStore;
+  providerManager?: AIProviderManager;
+  approvalStore?: ContextApprovalStore;
+  conversationStore?: ConversationStore;
+  usageStore?: AIUsageStore;
+  streamManager?: AIStreamManager;
+  streamEventEmitter?: StreamEventEmitter;
+  validateAIKey?: KeyValidatorFn;
 }
 
 const registeredChannels = new Set<ApprovedIpcChannel>();
@@ -58,6 +88,27 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   const fileService = deps.fileService ?? new WorkspaceFileService(authority);
   const engineManager = deps.engineManager ?? new CodeEngineManager();
   const selectFolder = deps.selectFolder ?? (async () => null);
+  const credentials =
+    deps.credentials ?? new CredentialStore(os.tmpdir(), UNAVAILABLE_SAFE_STORAGE);
+  const providerManager = deps.providerManager ?? new AIProviderManager(credentials);
+  const approvalStore = deps.approvalStore ?? new ContextApprovalStore();
+  const conversationStore = deps.conversationStore ?? new ConversationStore(os.tmpdir());
+  const usageStore = deps.usageStore ?? new AIUsageStore(os.tmpdir());
+  const contextBuilder = new WorkspaceContextBuilder(authority);
+  const transmissionGate = new SecureTransmissionGate({
+    authority,
+    approvalStore,
+    preferences: deps.preferences,
+    providerManager
+  });
+  const streamManager =
+    deps.streamManager ??
+    new AIStreamManager({
+      transmissionGate,
+      providerManager,
+      usageStore,
+      conversationStore
+    });
 
   const appHandlers = createAppHandlers(deps.metadata);
   const themeHandlers = createThemeHandlers(deps.preferences);
@@ -74,6 +125,31 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   const fileHandlers = createFileHandlers(fileService, async (workspaceRoot, relativePath) => {
     const realRoot = authority.getAuthorizedRoot(workspaceRoot);
     await engineManager.notifyFileSaved(realRoot, relativePath);
+    approvalStore.invalidateForFile(realRoot, relativePath);
+  });
+  const aiConfigHandlers = createAIConfigHandlers({
+    credentials,
+    preferences: deps.preferences,
+    providerManager,
+    onCredentialsChanged: (provider, reason) => {
+      streamManager.cancelAllForProvider(provider, reason);
+    },
+    validateKeyFn: deps.validateAIKey
+  });
+  const aiContextHandlers = createAIContextHandlers({
+    authority,
+    preferences: deps.preferences,
+    engineManager,
+    contextBuilder,
+    approvalStore,
+    transmissionGate
+  });
+  const aiStreamConvHandlers = createAIStreamAndConversationHandlers({
+    authority,
+    preferences: deps.preferences,
+    streamManager,
+    conversationStore,
+    usageStore
   });
 
   registerSafe(
@@ -194,6 +270,123 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     ipcMain,
     IPC_CHANNELS.FILE_STAT,
     wrapHandler((payload) => fileHandlers.statFile(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_GET_CONFIG,
+    wrapHandler(() => aiConfigHandlers.getConfig())
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_SET_KEY,
+    wrapHandler((payload) => aiConfigHandlers.setApiKey(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CLEAR_KEY,
+    wrapHandler((payload) => aiConfigHandlers.clearApiKey(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_SET_MODEL,
+    wrapHandler((payload) => aiConfigHandlers.setModel(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_VALIDATE_KEY,
+    wrapHandler((payload) => aiConfigHandlers.validateApiKey(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_BUILD_CONTEXT,
+    wrapHandler((payload) => aiContextHandlers.buildContext(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_APPROVE_CONTEXT,
+    wrapHandler((payload) => aiContextHandlers.approveContext(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_GET_CONTEXT_APPROVAL,
+    wrapHandler((payload) => aiContextHandlers.getContextApproval(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_EXECUTE_APPROVED_CONTEXT,
+    wrapHandler((payload) => aiContextHandlers.executeApprovedContext(payload))
+  );
+
+  registerSafe(ipcMain, IPC_CHANNELS.AI_STREAM_START, async (ipcEvent, payload) => {
+    try {
+      const sender = (ipcEvent as { sender?: { send?: (ch: string, data: unknown) => void } })
+        ?.sender;
+      const emit: StreamEventEmitter =
+        deps.streamEventEmitter ??
+        ((streamEvt) => {
+          sender?.send?.(IPC_CHANNELS.AI_STREAM_EVENT, streamEvt);
+        });
+      return aiStreamConvHandlers.startStream(payload, emit);
+    } catch (err) {
+      return {
+        ok: false,
+        error: {
+          code: "INTERNAL_IPC_ERROR",
+          message: err instanceof Error ? err.message : "Unexpected IPC error."
+        }
+      };
+    }
+  });
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_STREAM_CANCEL,
+    wrapHandler((payload) => aiStreamConvHandlers.cancelStream(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CONVERSATION_CREATE,
+    wrapHandler((payload) => aiStreamConvHandlers.createConversation(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CONVERSATION_LIST,
+    wrapHandler((payload) => aiStreamConvHandlers.listConversations(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CONVERSATION_GET,
+    wrapHandler((payload) => aiStreamConvHandlers.getConversation(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CONVERSATION_RENAME,
+    wrapHandler((payload) => aiStreamConvHandlers.renameConversation(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_CONVERSATION_DELETE,
+    wrapHandler((payload) => aiStreamConvHandlers.deleteConversation(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_GET_USAGE,
+    wrapHandler(() => aiStreamConvHandlers.getUsageSummary())
   );
 }
 

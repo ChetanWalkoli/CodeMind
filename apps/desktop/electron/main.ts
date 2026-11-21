@@ -1,6 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage } from "electron";
 import path from "node:path";
 import { APP_CONSTANTS } from "@codemind/config";
+import { ConversationStore } from "./ai/conversationStore.js";
+import { CredentialStore } from "./ai/credentialStore.js";
+import { AIProviderManager } from "./ai/providerManager.js";
+import { AIUsageStore } from "./ai/usageStore.js";
 import { registerIpcHandlers, unregisterIpcHandlers } from "./ipc/index.js";
 import { PreferencesStore } from "./utils/preferences.js";
 import { createMainWindow } from "./window.js";
@@ -18,6 +22,10 @@ if (disableGpu) {
 
 let mainWindow: BrowserWindow | null = null;
 let preferencesStore: PreferencesStore | null = null;
+let credentialStore: CredentialStore | null = null;
+let aiProviderManager: AIProviderManager | null = null;
+let conversationStore: ConversationStore | null = null;
+let usageStore: AIUsageStore | null = null;
 const workspaceAuthority = new WorkspaceAuthority();
 const workspaceFileService = new WorkspaceFileService(workspaceAuthority);
 
@@ -26,6 +34,34 @@ function getPreferencesStore(): PreferencesStore {
     preferencesStore = new PreferencesStore(app.getPath("userData"));
   }
   return preferencesStore;
+}
+
+function getCredentialStore(): CredentialStore {
+  if (!credentialStore) {
+    credentialStore = new CredentialStore(app.getPath("userData"), safeStorage);
+  }
+  return credentialStore;
+}
+
+function getAIProviderManager(): AIProviderManager {
+  if (!aiProviderManager) {
+    aiProviderManager = new AIProviderManager(getCredentialStore());
+  }
+  return aiProviderManager;
+}
+
+function getConversationStore(): ConversationStore {
+  if (!conversationStore) {
+    conversationStore = new ConversationStore(app.getPath("userData"));
+  }
+  return conversationStore;
+}
+
+function getUsageStore(): AIUsageStore {
+  if (!usageStore) {
+    usageStore = new AIUsageStore(app.getPath("userData"));
+  }
+  return usageStore;
 }
 
 function getPreloadPath(): string {
@@ -82,6 +118,10 @@ app
   .whenReady()
   .then(() => {
     const preferences = getPreferencesStore();
+    const credentials = getCredentialStore();
+    const providerManager = getAIProviderManager();
+    const conversations = getConversationStore();
+    const usage = getUsageStore();
 
     registerIpcHandlers(ipcMain, {
       metadata: {
@@ -96,7 +136,11 @@ app
       preferences,
       authority: workspaceAuthority,
       fileService: workspaceFileService,
-      selectFolder: selectWorkspaceFolderDialog
+      selectFolder: selectWorkspaceFolderDialog,
+      credentials,
+      providerManager,
+      conversationStore: conversations,
+      usageStore: usage
     });
 
     createWindow();

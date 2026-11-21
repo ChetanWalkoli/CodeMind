@@ -228,7 +228,79 @@ describe("Phase 4 Architecture Explorer & Source Navigation", () => {
           sizeBytes: 10
         }
       }),
-      statFile: vi.fn().mockResolvedValue({ ok: true, data: { exists: true } })
+      statFile: vi.fn().mockResolvedValue({ ok: true, data: { exists: true } }),
+      getAIConfig: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          provider: "gemini",
+          model: "gemini-2.5-flash",
+          availableModels: [{ id: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash" }],
+          hasApiKey: false,
+          maskedKeyHint: null,
+          encryptionAvailable: true,
+          credentialCorrupt: false,
+          statusError: null
+        }
+      }),
+      setAIApiKey: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      clearAIApiKey: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      setAIModel: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      validateAIApiKey: vi.fn().mockResolvedValue({
+        ok: true,
+        data: { valid: false, status: "not_configured", message: "No key" }
+      }),
+      buildAIContext: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      approveAIContext: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      getAIContextApproval: vi.fn().mockResolvedValue({
+        ok: true,
+        data: { snapshotId: "snap", approved: false, approvedAt: null, expiresAt: null }
+      }),
+      executeApprovedAIContext: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      startAIStream: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      cancelAIStream: vi
+        .fn()
+        .mockResolvedValue({ ok: true, data: { requestId: "r", cancelled: false } }),
+      onAIStreamEvent: vi.fn().mockReturnValue(() => undefined),
+      createAIConversation: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      listAIConversations: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      getAIConversation: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      renameAIConversation: vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      deleteAIConversation: vi.fn().mockResolvedValue({ ok: true, data: { deleted: true } }),
+      getAIUsageSummary: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          totalRequests: 0,
+          succeededRequests: 0,
+          failedRequests: 0,
+          cancelledRequests: 0,
+          providerReportedInputTokens: 0,
+          providerReportedOutputTokens: 0,
+          estimatedInputTokens: 0,
+          averageDurationMs: 0,
+          estimatedCostUsd: null,
+          recentRequests: []
+        }
+      })
     };
 
     window.codemindDesktop = mockBridge;

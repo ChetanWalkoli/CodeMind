@@ -1,5 +1,25 @@
 import { z } from "zod";
 import {
+  AIContextApprovalRecordSchema,
+  AIContextSnapshotSchema,
+  AIStreamIpcEventSchema,
+  AITaskTypeSchema,
+  AITokenBudgetSummarySchema,
+  AIUsageSummarySchema,
+  ConversationMessageSchema,
+  ConversationPageSchema,
+  ConversationSummarySchema,
+  StructuredResponseKindSchema,
+  type AIContextApprovalRecord,
+  type AIContextSnapshot,
+  type AIStreamIpcEvent,
+  type AITokenBudgetSummary,
+  type AIUsageSummary,
+  type ConversationMessage,
+  type ConversationPage,
+  type ConversationSummary
+} from "./ai.schema.js";
+import {
   ArchitectureOverviewSchema,
   CodeSymbolSchema,
   DependencyEdgeSchema,
@@ -34,6 +54,24 @@ export const IPC_CHANNELS = {
   ENGINE_GET_GRAPH: "engine:get-graph",
   ENGINE_GET_FILE_INTEL: "engine:get-file-intel",
   ENGINE_GET_OVERVIEW: "engine:get-overview",
+  AI_GET_CONFIG: "ai:get-config",
+  AI_SET_KEY: "ai:set-key",
+  AI_CLEAR_KEY: "ai:clear-key",
+  AI_SET_MODEL: "ai:set-model",
+  AI_VALIDATE_KEY: "ai:validate-key",
+  AI_BUILD_CONTEXT: "ai:build-context",
+  AI_APPROVE_CONTEXT: "ai:approve-context",
+  AI_GET_CONTEXT_APPROVAL: "ai:get-context-approval",
+  AI_EXECUTE_APPROVED_CONTEXT: "ai:execute-approved-context",
+  AI_STREAM_START: "ai:stream-start",
+  AI_STREAM_CANCEL: "ai:stream-cancel",
+  AI_STREAM_EVENT: "ai:stream-event",
+  AI_CONVERSATION_CREATE: "ai:conversation-create",
+  AI_CONVERSATION_LIST: "ai:conversation-list",
+  AI_CONVERSATION_GET: "ai:conversation-get",
+  AI_CONVERSATION_RENAME: "ai:conversation-rename",
+  AI_CONVERSATION_DELETE: "ai:conversation-delete",
+  AI_GET_USAGE: "ai:get-usage",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -290,6 +328,211 @@ export type FileIntelligence = {
   diagnostics: ParseDiagnostic[];
 };
 
+export const AIProviderNameSchema = z.enum(["gemini"]);
+export type AIProviderName = z.infer<typeof AIProviderNameSchema>;
+
+export const AIModelLifecycleSchema = z.enum(["active", "preview", "deprecated"]);
+export type AIModelLifecycle = z.infer<typeof AIModelLifecycleSchema>;
+
+export const AIModelOptionSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1),
+  contextWindowTokens: z.number().int().positive().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  freeTierAvailable: z.boolean().optional(),
+  lifecycleStatus: AIModelLifecycleSchema.optional()
+});
+
+export type AIModelOption = z.infer<typeof AIModelOptionSchema>;
+
+export const AIConfigStatusSchema = z.object({
+  provider: AIProviderNameSchema,
+  model: z.string().min(1),
+  availableModels: z.array(AIModelOptionSchema),
+  hasApiKey: z.boolean(),
+  maskedKeyHint: z.string().nullable(),
+  encryptionAvailable: z.boolean(),
+  credentialCorrupt: z.boolean().default(false),
+  statusError: z.string().nullable().default(null)
+});
+
+export type AIConfigStatus = z.infer<typeof AIConfigStatusSchema>;
+
+export const AISetKeyRequestSchema = z.object({
+  provider: AIProviderNameSchema.default("gemini"),
+  apiKey: z
+    .string()
+    .trim()
+    .min(10, "API key is too short.")
+    .refine((val) => !/\s/.test(val), "API key must not contain whitespace.")
+});
+
+export type AISetKeyRequest = z.infer<typeof AISetKeyRequestSchema>;
+
+export const AIClearKeyRequestSchema = z.object({
+  provider: AIProviderNameSchema.default("gemini")
+});
+
+export type AIClearKeyRequest = z.infer<typeof AIClearKeyRequestSchema>;
+
+export const AISetModelRequestSchema = z.object({
+  provider: AIProviderNameSchema.default("gemini"),
+  model: z.string().trim().min(1)
+});
+
+export type AISetModelRequest = z.infer<typeof AISetModelRequestSchema>;
+
+export const AIValidateKeyRequestSchema = z.object({
+  provider: AIProviderNameSchema.default("gemini"),
+  apiKey: z.string().trim().min(1).optional()
+});
+
+export type AIValidateKeyRequest = z.infer<typeof AIValidateKeyRequestSchema>;
+
+export const AIKeyValidationStatusSchema = z.enum([
+  "valid",
+  "auth_failed",
+  "rate_limited",
+  "timeout",
+  "network_error",
+  "provider_error",
+  "not_configured"
+]);
+
+export type AIKeyValidationStatus = z.infer<typeof AIKeyValidationStatusSchema>;
+
+export const AIValidateKeyResultSchema = z.object({
+  valid: z.boolean(),
+  status: AIKeyValidationStatusSchema,
+  message: z.string().min(1)
+});
+
+export type AIValidateKeyResult = z.infer<typeof AIValidateKeyResultSchema>;
+
+export const AIContextBuildRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  taskType: AITaskTypeSchema.default("code-qa"),
+  query: z.string().trim().min(1, "Query is required.").max(4000, "Query is too long."),
+  activeFilePath: z.string().min(1).optional(),
+  explicitFilePaths: z.array(z.string().min(1)).max(25).optional(),
+  excludedFilePaths: z.array(z.string().min(1)).max(100).optional(),
+  maxBytes: z.number().int().positive().max(65_536).optional(),
+  maxFiles: z.number().int().positive().max(25).optional(),
+  includeDependencies: z.boolean().default(true)
+});
+
+export type AIContextBuildRequest = z.infer<typeof AIContextBuildRequestSchema>;
+
+export const AIContextApprovalRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  snapshotId: z.string().min(1),
+  approved: z.boolean()
+});
+
+export type AIContextApprovalRequest = z.infer<typeof AIContextApprovalRequestSchema>;
+
+export const AIContextGetApprovalRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  snapshotId: z.string().min(1)
+});
+
+export type AIContextGetApprovalRequest = z.infer<typeof AIContextGetApprovalRequestSchema>;
+
+export const AIExecuteApprovedRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  snapshotId: z.string().min(1),
+  model: z.string().trim().min(1).optional(),
+  maxOutputTokens: z.number().int().positive().max(32_768).optional(),
+  structured: z.boolean().optional(),
+  structuredKind: StructuredResponseKindSchema.optional(),
+  conversationId: z.string().min(1).optional()
+});
+
+export type AIExecuteApprovedRequest = z.infer<typeof AIExecuteApprovedRequestSchema>;
+
+export const AIStreamStartRequestSchema = AIExecuteApprovedRequestSchema.extend({
+  requestId: z.string().trim().min(1).max(128).optional()
+});
+
+export type AIStreamStartRequest = z.infer<typeof AIStreamStartRequestSchema>;
+
+export const AIStreamStartResponseSchema = z.object({
+  requestId: z.string().min(1)
+});
+
+export type AIStreamStartResponse = z.infer<typeof AIStreamStartResponseSchema>;
+
+export const AIStreamCancelRequestSchema = z.object({
+  requestId: z.string().trim().min(1).max(128)
+});
+
+export type AIStreamCancelRequest = z.infer<typeof AIStreamCancelRequestSchema>;
+
+export const AIStreamCancelResponseSchema = z.object({
+  requestId: z.string().min(1),
+  cancelled: z.boolean()
+});
+
+export type AIStreamCancelResponse = z.infer<typeof AIStreamCancelResponseSchema>;
+
+export const AIConversationCreateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  title: z.string().trim().min(1).max(120).optional(),
+  taskType: AITaskTypeSchema.default("code-qa")
+});
+
+export type AIConversationCreateRequest = z.infer<typeof AIConversationCreateRequestSchema>;
+
+export const AIConversationListRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  includeArchived: z.boolean().optional()
+});
+
+export type AIConversationListRequest = z.infer<typeof AIConversationListRequestSchema>;
+
+export const AIConversationGetRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  conversationId: z.string().min(1),
+  limit: z.number().int().positive().max(100).default(30),
+  cursor: z.number().int().nonnegative().optional()
+});
+
+export type AIConversationGetRequest = z.infer<typeof AIConversationGetRequestSchema>;
+
+export const AIConversationRenameRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  conversationId: z.string().min(1),
+  title: z.string().trim().min(1).max(120)
+});
+
+export type AIConversationRenameRequest = z.infer<typeof AIConversationRenameRequestSchema>;
+
+export const AIConversationDeleteRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  conversationId: z.string().min(1)
+});
+
+export type AIConversationDeleteRequest = z.infer<typeof AIConversationDeleteRequestSchema>;
+
+export const AIExecuteApprovedResultSchema = z.object({
+  snapshotId: z.string().min(1),
+  model: z.string().min(1),
+  provider: z.string().min(1),
+  content: z.string(),
+  usage: z
+    .object({
+      inputTokens: z.number().int().nonnegative(),
+      outputTokens: z.number().int().nonnegative(),
+      totalTokens: z.number().int().nonnegative().optional()
+    })
+    .optional(),
+  budget: AITokenBudgetSummarySchema,
+  omittedFiles: z.array(z.string()),
+  truncatedFiles: z.array(z.string())
+});
+
+export type AIExecuteApprovedResult = z.infer<typeof AIExecuteApprovedResultSchema>;
+
 export interface CodeMindDesktopAPI {
   getAppInfo(): Promise<IpcResponse<AppInfo>>;
   getPlatformInfo(): Promise<IpcResponse<PlatformInfo>>;
@@ -308,12 +551,56 @@ export interface CodeMindDesktopAPI {
   getDependencyGraph(request: EngineGraphRequest): Promise<IpcResponse<DependencyGraphSnapshot>>;
   getFileIntelligence(request: EngineFileIntelRequest): Promise<IpcResponse<FileIntelligence>>;
   getArchitectureOverview(request: EngineGraphRequest): Promise<IpcResponse<ArchitectureOverview>>;
+  getAIConfig(): Promise<IpcResponse<AIConfigStatus>>;
+  setAIApiKey(request: AISetKeyRequest): Promise<IpcResponse<AIConfigStatus>>;
+  clearAIApiKey(request?: AIClearKeyRequest): Promise<IpcResponse<AIConfigStatus>>;
+  setAIModel(request: AISetModelRequest): Promise<IpcResponse<AIConfigStatus>>;
+  validateAIApiKey(request?: AIValidateKeyRequest): Promise<IpcResponse<AIValidateKeyResult>>;
+  buildAIContext(request: AIContextBuildRequest): Promise<IpcResponse<AIContextSnapshot>>;
+  approveAIContext(
+    request: AIContextApprovalRequest
+  ): Promise<IpcResponse<AIContextApprovalRecord>>;
+  getAIContextApproval(
+    request: AIContextGetApprovalRequest
+  ): Promise<IpcResponse<AIContextApprovalRecord>>;
+  executeApprovedAIContext(
+    request: AIExecuteApprovedRequest
+  ): Promise<IpcResponse<AIExecuteApprovedResult>>;
+  startAIStream(request: AIStreamStartRequest): Promise<IpcResponse<AIStreamStartResponse>>;
+  cancelAIStream(request: AIStreamCancelRequest): Promise<IpcResponse<AIStreamCancelResponse>>;
+  onAIStreamEvent(requestId: string, listener: (event: AIStreamIpcEvent) => void): () => void;
+  createAIConversation(
+    request: AIConversationCreateRequest
+  ): Promise<IpcResponse<ConversationSummary>>;
+  listAIConversations(
+    request: AIConversationListRequest
+  ): Promise<IpcResponse<ConversationSummary[]>>;
+  getAIConversation(request: AIConversationGetRequest): Promise<IpcResponse<ConversationPage>>;
+  renameAIConversation(
+    request: AIConversationRenameRequest
+  ): Promise<IpcResponse<ConversationSummary>>;
+  deleteAIConversation(
+    request: AIConversationDeleteRequest
+  ): Promise<IpcResponse<{ deleted: boolean }>>;
+  getAIUsageSummary(): Promise<IpcResponse<AIUsageSummary>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;
 }
 
 export {
+  AIContextApprovalRecordSchema,
+  AIContextSnapshotSchema,
+  AIStreamIpcEventSchema,
+  AITokenBudgetSummarySchema,
+  AIUsageSummarySchema,
+  ConversationMessageSchema,
+  ConversationPageSchema,
+  ConversationSummarySchema,
+  type AITokenBudgetSummary,
+  type ConversationMessage,
+  type ConversationPage,
+  type ConversationSummary,
   ArchitectureOverviewSchema,
   IndexSummarySchema,
   DependencyGraphSnapshotSchema,

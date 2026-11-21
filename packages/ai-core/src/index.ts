@@ -1,5 +1,29 @@
 import type { z } from "zod";
-export * from "./provider.js";
+
+export * from "./types/ai.types.js";
+export * from "./errors/aiError.js";
+export * from "./models/catalog.js";
+export * from "./reliability/retry.js";
+export * from "./reliability/pricing.js";
+export * from "./reliability/rateLimiter.js";
+export * from "./providers/registry.js";
+export {
+  GeminiProvider,
+  GeminiProviderConfigSchema,
+  type GeminiClientLike,
+  type GeminiProviderOptions,
+  type GeminiRawResponseChunk
+} from "./providers/gemini/geminiProvider.js";
+export * from "./prompts/templates.js";
+export * from "./prompts/injectionBoundary.js";
+export * from "./prompts/promptComposer.js";
+export * from "./context/ranking.js";
+export * from "./budget/tokenEstimator.js";
+export * from "./budget/tokenBudgeter.js";
+export * from "./security/secretScanner.js";
+export * from "./structured/responseParser.js";
+export * from "./structured/referenceValidator.js";
+export * from "./structured/structuredService.js";
 
 /**
  * Safely parse and validate JSON structured output from an AI provider against a Zod schema.
