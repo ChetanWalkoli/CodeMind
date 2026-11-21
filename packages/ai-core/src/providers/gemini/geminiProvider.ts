@@ -140,8 +140,32 @@ function normalizeGeminiUsage(meta?: GeminiRawResponseChunk["usageMetadata"]): A
   };
 }
 
+function unwrapGeminiErrorMessage(raw: string): string {
+  let current = raw.trim();
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!current.startsWith("{")) break;
+    try {
+      const parsed = JSON.parse(current) as {
+        error?: { message?: unknown };
+        message?: unknown;
+      };
+      const inner =
+        typeof parsed?.error?.message === "string"
+          ? parsed.error.message
+          : typeof parsed?.message === "string"
+            ? parsed.message
+            : null;
+      if (!inner || inner.trim() === current) break;
+      current = inner.trim();
+    } catch {
+      break;
+    }
+  }
+  return current;
+}
+
 function sanitizeKeyFromMessage(message: string, apiKey: string): string {
-  let safe = redactSecrets(message);
+  let safe = redactSecrets(unwrapGeminiErrorMessage(message));
   if (apiKey.trim().length > 0) {
     safe = safe.split(apiKey.trim()).join("[REDACTED]");
   }
@@ -364,24 +388,43 @@ export class GeminiProvider implements AIProvider {
     const model = this.resolveModel(input.model);
     const timeoutMs = input.timeoutMs ?? this.timeoutMs;
 
+    // Retry transient 503/429/network failures when opening the stream (before any tokens are yielded)
+    const iterable = await executeWithRetry(
+      async (attemptSignal) => {
+        try {
+          return await this.client.generateContentStream({
+            model,
+            contents,
+            config: {
+              systemInstruction,
+              temperature: input.temperature,
+              maxOutputTokens: input.maxTokens,
+              responseMimeType: input.responseFormat === "json" ? "application/json" : undefined,
+              abortSignal: attemptSignal
+            }
+          });
+        } catch (err) {
+          if (isAbortError(err) && !input.signal?.aborted) {
+            throw err;
+          }
+          throw mapGeminiError(err, this.apiKey, false);
+        }
+      },
+      {
+        provider: "gemini",
+        timeoutMs,
+        retryPolicy: this.retryPolicy,
+        signal: input.signal,
+        sleepFn: this.sleepFn
+      }
+    );
+
     const linked = createLinkedTimeoutController(timeoutMs, input.signal);
     let accumulated = "";
     let finishReason: string | null = null;
     let finalUsage: AIUsage | undefined;
 
     try {
-      const iterable = await this.client.generateContentStream({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          temperature: input.temperature,
-          maxOutputTokens: input.maxTokens,
-          responseMimeType: input.responseFormat === "json" ? "application/json" : undefined,
-          abortSignal: linked.controller.signal
-        }
-      });
-
       for await (const chunk of iterable) {
         if (linked.controller.signal.aborted) {
           throw mapGeminiError(

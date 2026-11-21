@@ -6,18 +6,22 @@ import {
   AITaskTypeSchema,
   AITokenBudgetSummarySchema,
   AIUsageSummarySchema,
+  ContextSearchCandidateSchema,
   ConversationMessageSchema,
   ConversationPageSchema,
   ConversationSummarySchema,
+  ResolvedMissingFileSchema,
   StructuredResponseKindSchema,
   type AIContextApprovalRecord,
   type AIContextSnapshot,
   type AIStreamIpcEvent,
   type AITokenBudgetSummary,
   type AIUsageSummary,
+  type ContextSearchCandidate,
   type ConversationMessage,
   type ConversationPage,
-  type ConversationSummary
+  type ConversationSummary,
+  type ResolvedMissingFile
 } from "./ai.schema.js";
 import {
   ArchitectureOverviewSchema,
@@ -60,6 +64,8 @@ export const IPC_CHANNELS = {
   AI_SET_MODEL: "ai:set-model",
   AI_VALIDATE_KEY: "ai:validate-key",
   AI_BUILD_CONTEXT: "ai:build-context",
+  AI_SEARCH_CONTEXT_FILES: "ai:search-context-files",
+  AI_RESOLVE_MISSING_FILES: "ai:resolve-missing-files",
   AI_APPROVE_CONTEXT: "ai:approve-context",
   AI_GET_CONTEXT_APPROVAL: "ai:get-context-approval",
   AI_EXECUTE_APPROVED_CONTEXT: "ai:execute-approved-context",
@@ -416,12 +422,30 @@ export const AIContextBuildRequestSchema = z.object({
   activeFilePath: z.string().min(1).optional(),
   explicitFilePaths: z.array(z.string().min(1)).max(25).optional(),
   excludedFilePaths: z.array(z.string().min(1)).max(100).optional(),
-  maxBytes: z.number().int().positive().max(65_536).optional(),
-  maxFiles: z.number().int().positive().max(25).optional(),
+  maxBytes: z.number().int().positive().max(262_144).optional(),
+  perFileMaxBytes: z.number().int().positive().max(65_536).optional(),
+  maxFiles: z.number().int().positive().max(30).optional(),
   includeDependencies: z.boolean().default(true)
 });
 
 export type AIContextBuildRequest = z.infer<typeof AIContextBuildRequestSchema>;
+
+export const AISearchContextFilesRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  query: z.string().trim().min(1).max(200),
+  limit: z.number().int().positive().max(30).default(15)
+});
+
+export type AISearchContextFilesRequest = z.infer<typeof AISearchContextFilesRequestSchema>;
+
+export const AIResolveMissingFilesRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  snapshotId: z.string().min(1).optional(),
+  includedFilePaths: z.array(z.string().min(1)).max(50).optional(),
+  suggestedPaths: z.array(z.string().trim().min(1).max(300)).max(25)
+});
+
+export type AIResolveMissingFilesRequest = z.infer<typeof AIResolveMissingFilesRequestSchema>;
 
 export const AIContextApprovalRequestSchema = z.object({
   workspaceRoot: z.string().min(1),
@@ -557,6 +581,12 @@ export interface CodeMindDesktopAPI {
   setAIModel(request: AISetModelRequest): Promise<IpcResponse<AIConfigStatus>>;
   validateAIApiKey(request?: AIValidateKeyRequest): Promise<IpcResponse<AIValidateKeyResult>>;
   buildAIContext(request: AIContextBuildRequest): Promise<IpcResponse<AIContextSnapshot>>;
+  searchAIContextFiles(
+    request: AISearchContextFilesRequest
+  ): Promise<IpcResponse<ContextSearchCandidate[]>>;
+  resolveAIMissingFiles(
+    request: AIResolveMissingFilesRequest
+  ): Promise<IpcResponse<ResolvedMissingFile[]>>;
   approveAIContext(
     request: AIContextApprovalRequest
   ): Promise<IpcResponse<AIContextApprovalRecord>>;
@@ -594,13 +624,17 @@ export {
   AIStreamIpcEventSchema,
   AITokenBudgetSummarySchema,
   AIUsageSummarySchema,
+  ContextSearchCandidateSchema,
   ConversationMessageSchema,
   ConversationPageSchema,
   ConversationSummarySchema,
+  ResolvedMissingFileSchema,
   type AITokenBudgetSummary,
+  type ContextSearchCandidate,
   type ConversationMessage,
   type ConversationPage,
   type ConversationSummary,
+  type ResolvedMissingFile,
   ArchitectureOverviewSchema,
   IndexSummarySchema,
   DependencyGraphSnapshotSchema,

@@ -15,7 +15,29 @@ export {
 } from "./symbols/symbolExtractor.js";
 export { extractImports, resolveRelativeSpecifier } from "./imports/importExtractor.js";
 export { DependencyGraph } from "./graph/dependencyGraph.js";
-export { SearchIndex, type SymbolSearchOptions } from "./search/searchIndex.js";
+export {
+  SearchIndex,
+  type FileSearchDetailedResult,
+  type SymbolSearchOptions
+} from "./search/searchIndex.js";
+export {
+  damerauLevenshteinDistance,
+  normalizeMorphology,
+  scoreCandidateAgainstTerm,
+  splitIdentifierTokens,
+  type SearchMatchKind,
+  type TokenMatchScore
+} from "./search/textNormalization.js";
+export {
+  buildApiRelationships,
+  extractApiArtifactsFromFile,
+  normalizeApiEndpoint,
+  type ApiRelationship,
+  type ExtractedApiCall,
+  type ExtractedApiHandler,
+  type ExtractedRouteMount,
+  type HttpMethod
+} from "./api/apiRelationshipExtractor.js";
 export {
   ProjectIndexer,
   type IncrementalSyncResult,

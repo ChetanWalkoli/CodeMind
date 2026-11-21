@@ -15,6 +15,8 @@ import {
   type AIConversationRenameRequest,
   type AIExecuteApprovedRequest,
   type AIExecuteApprovedResult,
+  type AIResolveMissingFilesRequest,
+  type AISearchContextFilesRequest,
   type AIStreamCancelRequest,
   type AIStreamCancelResponse,
   type AIStreamIpcEvent,
@@ -28,9 +30,11 @@ import {
   type AppInfo,
   type ArchitectureOverview,
   type CodeMindDesktopAPI,
+  type ContextSearchCandidate,
   type ConversationPage,
   type ConversationSummary,
   type DependencyGraphSnapshot,
+  type ResolvedMissingFile,
   type EngineFileIntelRequest,
   type EngineGraphRequest,
   type EngineIndexRequest,
@@ -554,6 +558,32 @@ export const desktopApi = {
       };
     }
     return safeInvoke(() => bridge.buildAIContext(request), "BRIDGE_AI_CONTEXT_BUILD_FAILED");
+  },
+
+  async searchAIContextFiles(
+    request: AISearchContextFilesRequest
+  ): Promise<IpcResponse<ContextSearchCandidate[]>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: [] };
+    }
+    return safeInvoke(
+      () => bridge.searchAIContextFiles(request),
+      "BRIDGE_AI_CONTEXT_SEARCH_FAILED"
+    );
+  },
+
+  async resolveAIMissingFiles(
+    request: AIResolveMissingFilesRequest
+  ): Promise<IpcResponse<ResolvedMissingFile[]>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return { ok: true, data: [] };
+    }
+    return safeInvoke(
+      () => bridge.resolveAIMissingFiles(request),
+      "BRIDGE_AI_MISSING_FILES_RESOLVE_FAILED"
+    );
   },
 
   async approveAIContext(

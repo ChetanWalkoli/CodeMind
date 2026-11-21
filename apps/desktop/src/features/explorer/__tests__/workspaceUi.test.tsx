@@ -206,6 +206,8 @@ describe("Phase 2 Workspace UI Integration", () => {
       buildAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      searchAIContextFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      resolveAIMissingFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
       approveAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
@@ -454,6 +456,8 @@ describe("Phase 2 Workspace UI Integration", () => {
       buildAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      searchAIContextFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      resolveAIMissingFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
       approveAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),

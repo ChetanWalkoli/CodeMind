@@ -12,6 +12,8 @@ import {
   type AIConversationListRequest,
   type AIConversationRenameRequest,
   type AIExecuteApprovedRequest,
+  type AIResolveMissingFilesRequest,
+  type AISearchContextFilesRequest,
   type AIStreamCancelRequest,
   type AIStreamIpcEvent,
   type AIStreamStartRequest,
@@ -80,6 +82,10 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
     ipcRenderer.invoke(IPC_CHANNELS.AI_VALIDATE_KEY, request),
   buildAIContext: (request: AIContextBuildRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_BUILD_CONTEXT, request),
+  searchAIContextFiles: (request: AISearchContextFilesRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_SEARCH_CONTEXT_FILES, request),
+  resolveAIMissingFiles: (request: AIResolveMissingFilesRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_RESOLVE_MISSING_FILES, request),
   approveAIContext: (request: AIContextApprovalRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_APPROVE_CONTEXT, request),
   getAIContextApproval: (request: AIContextGetApprovalRequest) =>

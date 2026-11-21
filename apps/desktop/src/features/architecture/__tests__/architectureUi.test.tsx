@@ -258,6 +258,8 @@ describe("Phase 4 Architecture Explorer & Source Navigation", () => {
       buildAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
+      searchAIContextFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
+      resolveAIMissingFiles: vi.fn().mockResolvedValue({ ok: true, data: [] }),
       approveAIContext: vi
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),

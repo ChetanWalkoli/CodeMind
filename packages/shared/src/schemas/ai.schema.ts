@@ -79,10 +79,16 @@ export const ContextInclusionReasonSchema = z.enum([
   "active-file",
   "selected-symbol",
   "explicit-file",
+  "user-added",
   "symbol-match",
+  "normalized-match",
+  "fuzzy-match",
   "path-match",
   "dependency",
   "dependent",
+  "api-relationship",
+  "backend-implementation",
+  "frontend-integration",
   "architecture-summary"
 ]);
 
@@ -145,6 +151,55 @@ export const AITokenBudgetSummarySchema = z.object({
 
 export type AITokenBudgetSummary = z.infer<typeof AITokenBudgetSummarySchema>;
 
+export const ContextCoverageMetricsSchema = z.object({
+  totalCandidates: z.number().int().nonnegative(),
+  selectedFiles: z.number().int().nonnegative(),
+  includedFiles: z.number().int().nonnegative(),
+  excludedFiles: z.number().int().nonnegative(),
+  truncatedFiles: z.number().int().nonnegative(),
+  perFileMaxBytes: z.number().int().positive(),
+  queryIntent: z.enum(["implementation", "ui", "api", "debugging", "architecture", "neutral"])
+});
+
+export type ContextCoverageMetrics = z.infer<typeof ContextCoverageMetricsSchema>;
+
+export const MissingSourceSuggestionSchema = z.object({
+  filePath: z.string().min(1),
+  reason: z.string().min(1).optional()
+});
+
+export type MissingSourceSuggestion = z.infer<typeof MissingSourceSuggestionSchema>;
+
+export const ResolvedMissingFileStatusSchema = z.enum([
+  "exact-match",
+  "similar-match",
+  "not-found",
+  "excluded-security",
+  "already-included",
+  "unsupported"
+]);
+
+export type ResolvedMissingFileStatus = z.infer<typeof ResolvedMissingFileStatusSchema>;
+
+export const ResolvedMissingFileSchema = z.object({
+  requestedPath: z.string().min(1),
+  resolvedPath: z.string().nullable(),
+  status: ResolvedMissingFileStatusSchema,
+  reason: z.string().min(1)
+});
+
+export type ResolvedMissingFile = z.infer<typeof ResolvedMissingFileSchema>;
+
+export const ContextSearchCandidateSchema = z.object({
+  filePath: z.string().min(1),
+  language: z.string().min(1),
+  role: z.string().min(1),
+  matchReason: z.string().min(1),
+  blockedReason: z.string().nullable()
+});
+
+export type ContextSearchCandidate = z.infer<typeof ContextSearchCandidateSchema>;
+
 export const AIContextSnapshotSchema = z.object({
   snapshotId: z.string().min(1),
   workspaceRoot: z.string().min(1),
@@ -158,6 +213,7 @@ export const AIContextSnapshotSchema = z.object({
   estimatedTokens: z.number().int().nonnegative(),
   budgetBytes: z.number().int().positive(),
   budget: AITokenBudgetSummarySchema.optional(),
+  coverage: ContextCoverageMetricsSchema.optional(),
   createdAt: z.string().datetime()
 });
 
@@ -187,7 +243,8 @@ export const StructuredExplanationResponseSchema = CodebaseAnswerSchema.extend({
   verifiedFacts: z.array(z.string().min(1)).default([]),
   interpretations: z.array(z.string().min(1)).default([]),
   recommendations: z.array(z.string().min(1)).default([]),
-  assumptions: z.array(z.string().min(1)).default([])
+  assumptions: z.array(z.string().min(1)).default([]),
+  missingFiles: z.array(MissingSourceSuggestionSchema).default([])
 });
 
 export type StructuredExplanationResponse = z.infer<typeof StructuredExplanationResponseSchema>;

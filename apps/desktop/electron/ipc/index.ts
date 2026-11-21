@@ -316,6 +316,18 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
 
   registerSafe(
     ipcMain,
+    IPC_CHANNELS.AI_SEARCH_CONTEXT_FILES,
+    wrapHandler((payload) => aiContextHandlers.searchContextFiles(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.AI_RESOLVE_MISSING_FILES,
+    wrapHandler((payload) => aiContextHandlers.resolveMissingFiles(payload))
+  );
+
+  registerSafe(
+    ipcMain,
     IPC_CHANNELS.AI_GET_CONTEXT_APPROVAL,
     wrapHandler((payload) => aiContextHandlers.getContextApproval(payload))
   );

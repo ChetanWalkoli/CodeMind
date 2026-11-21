@@ -12,6 +12,14 @@ import type {
   SupportedLanguage,
   SymbolSearchResult
 } from "@codemind/shared";
+import {
+  buildApiRelationships,
+  extractApiArtifactsFromFile,
+  type ApiRelationship,
+  type ExtractedApiCall,
+  type ExtractedApiHandler,
+  type ExtractedRouteMount
+} from "../api/apiRelationshipExtractor.js";
 import { DependencyGraph } from "../graph/dependencyGraph.js";
 import { extractImports, resolveRelativeSpecifier } from "../imports/importExtractor.js";
 import { parseJsTsSource } from "../parsers/tsParser.js";
@@ -22,7 +30,11 @@ import {
   scanWorkspaceFiles,
   type ScannedFile
 } from "../scanner/scanner.js";
-import { SearchIndex, type SymbolSearchOptions } from "../search/searchIndex.js";
+import {
+  SearchIndex,
+  type FileSearchDetailedResult,
+  type SymbolSearchOptions
+} from "../search/searchIndex.js";
 import { extractSymbolsAndExports } from "../symbols/symbolExtractor.js";
 
 export interface IndexedFileEntry {
@@ -31,6 +43,9 @@ export interface IndexedFileEntry {
   imports: ImportRecord[];
   exports: ExportRecord[];
   diagnostics: ParseDiagnostic[];
+  apiCalls?: ExtractedApiCall[];
+  apiHandlers?: ExtractedApiHandler[];
+  routeMounts?: ExtractedRouteMount[];
 }
 
 export interface IncrementalSyncResult {
@@ -51,6 +66,7 @@ export class ProjectIndexer {
   private readonly files = new Map<string, IndexedFileEntry>();
   private readonly graph = new DependencyGraph();
   private readonly searchIndex = new SearchIndex();
+  private cachedApiRelationships: ApiRelationship[] | null = null;
   private lastDurationMs = 0;
   private lastIndexedAt = new Date().toISOString();
 
@@ -150,6 +166,7 @@ export class ProjectIndexer {
     this.files.delete(posixRel);
     this.searchIndex.removeFile(posixRel);
     this.graph.removeFile(posixRel);
+    this.cachedApiRelationships = null;
 
     for (const entry of this.files.values()) {
       for (const imp of entry.imports) {
@@ -262,13 +279,18 @@ export class ProjectIndexer {
     const parsed = parseJsTsSource(item.node.path, item.content, item.node.language);
     const { symbols, exports } = extractSymbolsAndExports(item.node.path, parsed.sourceFile);
     const imports = extractImports(item.node.path, parsed.sourceFile, knownFileSet);
+    const api = extractApiArtifactsFromFile(item.node.path, item.content);
+    this.cachedApiRelationships = null;
 
     return {
       node: item.node,
       symbols,
       imports,
       exports,
-      diagnostics: parsed.diagnostics
+      diagnostics: parsed.diagnostics,
+      apiCalls: api.calls,
+      apiHandlers: api.handlers,
+      routeMounts: api.mounts
     };
   }
 
@@ -451,5 +473,39 @@ export class ProjectIndexer {
 
   public searchFiles(query: string, limit = 50): FileNode[] {
     return this.searchIndex.searchFiles(query, limit);
+  }
+
+  public searchFilesDetailed(query: string, limit = 50): FileSearchDetailedResult[] {
+    return this.searchIndex.searchFilesDetailed(query, limit);
+  }
+
+  public getAllFilePaths(): string[] {
+    return Array.from(this.files.keys()).sort((a, b) => a.localeCompare(b));
+  }
+
+  public getApiRelationships(): ApiRelationship[] {
+    if (this.cachedApiRelationships !== null) {
+      return this.cachedApiRelationships;
+    }
+
+    const calls: ExtractedApiCall[] = [];
+    const handlers: ExtractedApiHandler[] = [];
+    const mounts: ExtractedRouteMount[] = [];
+
+    for (const entry of this.files.values()) {
+      if (entry.apiCalls) calls.push(...entry.apiCalls);
+      if (entry.apiHandlers) handlers.push(...entry.apiHandlers);
+      if (entry.routeMounts) mounts.push(...entry.routeMounts);
+    }
+
+    this.cachedApiRelationships = buildApiRelationships(calls, handlers, mounts);
+    return this.cachedApiRelationships;
+  }
+
+  public getApiRelationshipsForFile(relativePath: string): ApiRelationship[] {
+    const posixRel = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+    return this.getApiRelationships().filter(
+      (rel) => rel.callerFile === posixRel || rel.handlerFile === posixRel
+    );
   }
 }

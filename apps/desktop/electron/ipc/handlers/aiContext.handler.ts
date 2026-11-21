@@ -1,9 +1,11 @@
 import {
   AIProviderError,
   budgetContextForModel,
+  classifyFileRole,
   computeContextSnapshotId,
   redactSecrets
 } from "@codemind/ai-core";
+import { CodeEngineIgnore } from "@codemind/code-engine";
 import {
   AIContextApprovalRecordSchema,
   AIContextApprovalRequestSchema,
@@ -12,14 +14,24 @@ import {
   AIContextSnapshotSchema,
   AIExecuteApprovedRequestSchema,
   AIExecuteApprovedResultSchema,
+  AIResolveMissingFilesRequestSchema,
+  AISearchContextFilesRequestSchema,
+  ContextSearchCandidateSchema,
+  ResolvedMissingFileSchema,
   type AIContextApprovalRecord,
   type AIContextSnapshot,
   type AIExecuteApprovedResult,
-  type IpcResponse
+  type ContextSearchCandidate,
+  type IpcResponse,
+  type ResolvedMissingFile
 } from "@codemind/shared";
 import { ContextApprovalError, type ContextApprovalStore } from "../../ai/contextApprovalStore.js";
-import type { WorkspaceContextBuilder } from "../../ai/contextBuilder.js";
+import {
+  isSensitiveContextFilePath,
+  type WorkspaceContextBuilder
+} from "../../ai/contextBuilder.js";
 import { CredentialStoreError } from "../../ai/credentialStore.js";
+import { resolveMissingFileSuggestions } from "../../ai/missingFileResolver.js";
 import type { SecureTransmissionGate } from "../../ai/transmissionGate.js";
 import type { PreferencesStore } from "../../utils/preferences.js";
 import { WorkspaceSecurityError, type WorkspaceAuthority } from "../../workspace/pathSecurity.js";
@@ -197,6 +209,120 @@ export function createAIContextHandlers(deps: {
         return { ok: true, data: AIExecuteApprovedResultSchema.parse(result) };
       } catch (err) {
         return toSafeError(err, "AI_EXECUTE_APPROVED_FAILED");
+      }
+    },
+
+    async searchContextFiles(payload: unknown): Promise<IpcResponse<ContextSearchCandidate[]>> {
+      const parsed = AISearchContextFilesRequestSchema.safeParse(payload);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          error: {
+            code: "INVALID_PAYLOAD",
+            message: parsed.error.issues.map((i) => i.message).join("; ")
+          }
+        };
+      }
+
+      try {
+        const realRoot = deps.authority.getAuthorizedRoot(parsed.data.workspaceRoot);
+        const customExcludes = deps.preferences.getWorkspaceSession().customExcludes;
+
+        let indexer = deps.engineManager.get(realRoot);
+        if (!indexer) {
+          indexer = deps.engineManager.getOrCreate(realRoot, customExcludes);
+          await indexer.indexWorkspace();
+        }
+
+        const ignore = CodeEngineIgnore.fromWorkspace(realRoot, customExcludes);
+        const limit = parsed.data.limit ?? 20;
+        const query = parsed.data.query.trim();
+
+        const rawMatches: Array<{ filePath: string; language: string; matchReason: string }> = [];
+
+        if (!query) {
+          const snapshot = indexer.getGraphSnapshot();
+          for (const node of [...snapshot.nodes]
+            .sort((a, b) => a.path.localeCompare(b.path))
+            .slice(0, limit)) {
+            rawMatches.push({
+              filePath: node.path,
+              language: node.language,
+              matchReason: "indexed"
+            });
+          }
+        } else {
+          const detailed = indexer.searchFilesDetailed(query, limit);
+          for (const m of detailed) {
+            rawMatches.push({
+              filePath: m.file.path,
+              language: m.file.language,
+              matchReason: m.matchKind
+            });
+          }
+        }
+
+        const candidates: ContextSearchCandidate[] = rawMatches.map((entry) => {
+          const symbolNames = indexer.getFileSymbols(entry.filePath).map((s) => s.name);
+          const role = classifyFileRole(entry.filePath, symbolNames);
+          let blockedReason: string | null = null;
+          if (isSensitiveContextFilePath(entry.filePath)) {
+            blockedReason = "Sensitive or secret file cannot be included.";
+          } else if (ignore.shouldIgnore(entry.filePath, false)) {
+            blockedReason = "Excluded by workspace ignore rules.";
+          }
+          return ContextSearchCandidateSchema.parse({
+            filePath: entry.filePath,
+            language: entry.language,
+            role,
+            matchReason: entry.matchReason,
+            blockedReason
+          });
+        });
+
+        return { ok: true, data: candidates };
+      } catch (err) {
+        return toSafeError(err, "AI_SEARCH_CONTEXT_FILES_FAILED");
+      }
+    },
+
+    async resolveMissingFiles(payload: unknown): Promise<IpcResponse<ResolvedMissingFile[]>> {
+      const parsed = AIResolveMissingFilesRequestSchema.safeParse(payload);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          error: {
+            code: "INVALID_PAYLOAD",
+            message: parsed.error.issues.map((i) => i.message).join("; ")
+          }
+        };
+      }
+
+      try {
+        const realRoot = deps.authority.getAuthorizedRoot(parsed.data.workspaceRoot);
+        const customExcludes = deps.preferences.getWorkspaceSession().customExcludes;
+
+        let indexer = deps.engineManager.get(realRoot);
+        if (!indexer) {
+          indexer = deps.engineManager.getOrCreate(realRoot, customExcludes);
+          await indexer.indexWorkspace();
+        }
+
+        const resolved = resolveMissingFileSuggestions({
+          authorizedRoot: realRoot,
+          indexer,
+          authority: deps.authority,
+          customExcludes,
+          includedFilePaths: parsed.data.includedFilePaths,
+          suggestedPaths: parsed.data.suggestedPaths
+        });
+
+        return {
+          ok: true,
+          data: resolved.map((entry) => ResolvedMissingFileSchema.parse(entry))
+        };
+      } catch (err) {
+        return toSafeError(err, "AI_RESOLVE_MISSING_FILES_FAILED");
       }
     }
   };

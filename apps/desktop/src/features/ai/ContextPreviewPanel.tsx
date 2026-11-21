@@ -3,8 +3,10 @@ import {
   CheckCircle2,
   Eye,
   FileCode2,
+  FolderPlus,
   MessageSquarePlus,
   Play,
+  Plus,
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
@@ -17,14 +19,50 @@ import type {
   AIContextApprovalRecord,
   AIContextSnapshot,
   AITaskType,
+  ContextSearchCandidate,
   ConversationMessage,
   ConversationSummary,
+  ResolvedMissingFile,
   VerifiedSourceReferenceItem
 } from "@codemind/shared";
 import { desktopApi } from "../../services/desktopApi";
 import { useEditorStore } from "../../stores/editor.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
 import styles from "./ContextPreviewPanel.module.scss";
+
+function extractSuggestedPathsFromResponse(content: string): string[] {
+  const candidates = new Set<string>();
+
+  // 1. Check structured JSON missingFiles if present
+  const trimmed = content.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed) as { missingFiles?: Array<{ filePath?: string }> };
+      if (Array.isArray(parsed.missingFiles)) {
+        for (const entry of parsed.missingFiles) {
+          if (typeof entry?.filePath === "string" && entry.filePath.trim()) {
+            candidates.add(entry.filePath.trim());
+          }
+        }
+      }
+    } catch {
+      // Ignore non-JSON content
+    }
+  }
+
+  // 2. Extract backticked file/directory paths from markdown prose
+  const backtickRe =
+    /`([A-Za-z0-9_./-]+\/[A-Za-z0-9_./-]+|[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|json|yaml|yml))`/g;
+  let match: RegExpExecArray | null;
+  while ((match = backtickRe.exec(content)) !== null) {
+    const token = (match[1] ?? "").trim();
+    if (!token || token.startsWith("http://") || token.startsWith("https://")) continue;
+    if (token.startsWith("/api/")) continue;
+    candidates.add(token);
+  }
+
+  return Array.from(candidates).slice(0, 20);
+}
 
 const TASK_OPTIONS: { value: AITaskType; label: string }[] = [
   { value: "code-qa", label: "Codebase Q&A" },
@@ -45,6 +83,13 @@ export function ContextPreviewPanel() {
   const [includeDependencies, setIncludeDependencies] = useState(true);
   const [structuredMode, setStructuredMode] = useState(false);
   const [userExcludedPaths, setUserExcludedPaths] = useState<string[]>([]);
+  const [manualAddedPaths, setManualAddedPaths] = useState<string[]>([]);
+  const [showAddFiles, setShowAddFiles] = useState(false);
+  const [fileSearchQuery, setFileSearchQuery] = useState("");
+  const [fileSearchResults, setFileSearchResults] = useState<ContextSearchCandidate[]>([]);
+  const [searchingFiles, setSearchingFiles] = useState(false);
+  const [missingSuggestions, setMissingSuggestions] = useState<ResolvedMissingFile[]>([]);
+  const [selectedMissingPaths, setSelectedMissingPaths] = useState<string[]>([]);
   const [snapshot, setSnapshot] = useState<AIContextSnapshot | null>(null);
   const [approval, setApproval] = useState<AIContextApprovalRecord | null>(null);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -88,6 +133,12 @@ export function ContextPreviewPanel() {
     setSnapshot(null);
     setApproval(null);
     setUserExcludedPaths([]);
+    setManualAddedPaths([]);
+    setShowAddFiles(false);
+    setFileSearchQuery("");
+    setFileSearchResults([]);
+    setMissingSuggestions([]);
+    setSelectedMissingPaths([]);
     setExpandedItems({});
     setError(null);
     setStreamState("idle");
@@ -220,6 +271,27 @@ export function ContextPreviewPanel() {
         if (activeConversationId) {
           void loadConversationPage(activeConversationId);
         }
+        const suggested = extractSuggestedPathsFromResponse(evt.content);
+        if (suggested.length > 0 && workspace && snapshot) {
+          void desktopApi
+            .resolveAIMissingFiles({
+              workspaceRoot: workspace.rootPath,
+              suggestedPaths: suggested,
+              includedFilePaths: snapshot.items.map((item) => item.filePath)
+            })
+            .then((res) => {
+              if (!res.ok) return;
+              const actionable = res.data.filter(
+                (entry) =>
+                  (entry.status === "exact-match" || entry.status === "similar-match") &&
+                  entry.resolvedPath !== null
+              );
+              setMissingSuggestions(actionable);
+              setSelectedMissingPaths(
+                actionable.map((entry) => entry.resolvedPath).filter((p): p is string => Boolean(p))
+              );
+            });
+        }
       } else if (evt.type === "stream:error") {
         setStreamState("failed");
         setStreamProgress(null);
@@ -260,7 +332,10 @@ export function ContextPreviewPanel() {
     setApproval(null);
   };
 
-  const buildPreview = async (overrides?: { excludedPaths?: string[] }) => {
+  const buildPreview = async (overrides?: {
+    excludedPaths?: string[];
+    explicitPaths?: string[];
+  }) => {
     if (!workspace) return;
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
@@ -269,6 +344,7 @@ export function ContextPreviewPanel() {
     }
 
     const nextExcluded = overrides?.excludedPaths ?? userExcludedPaths;
+    const nextExplicit = overrides?.explicitPaths ?? manualAddedPaths;
     setBusy(true);
     setError(null);
     setApproval(null);
@@ -279,6 +355,7 @@ export function ContextPreviewPanel() {
         taskType,
         query: trimmedQuery,
         activeFilePath: activeTab?.relativePath,
+        explicitFilePaths: nextExplicit.length > 0 ? nextExplicit : undefined,
         excludedFilePaths: nextExcluded,
         includeDependencies
       });
@@ -306,9 +383,11 @@ export function ContextPreviewPanel() {
 
   const handleExcludeFile = (filePath: string) => {
     const nextExcluded = Array.from(new Set([...userExcludedPaths, filePath]));
+    const nextExplicit = manualAddedPaths.filter((p) => p !== filePath);
     setUserExcludedPaths(nextExcluded);
+    setManualAddedPaths(nextExplicit);
     invalidateLocalSnapshot();
-    void buildPreview({ excludedPaths: nextExcluded });
+    void buildPreview({ excludedPaths: nextExcluded, explicitPaths: nextExplicit });
   };
 
   const handleRestoreFile = (filePath: string) => {
@@ -316,6 +395,59 @@ export function ContextPreviewPanel() {
     setUserExcludedPaths(nextExcluded);
     invalidateLocalSnapshot();
     void buildPreview({ excludedPaths: nextExcluded });
+  };
+
+  const handleSearchContextFiles = async (nextQuery: string) => {
+    setFileSearchQuery(nextQuery);
+    if (!workspace) return;
+    setSearchingFiles(true);
+    try {
+      const res = await desktopApi.searchAIContextFiles({
+        workspaceRoot: workspace.rootPath,
+        query: nextQuery,
+        limit: 15
+      });
+      if (res.ok) {
+        setFileSearchResults(res.data);
+      }
+    } finally {
+      setSearchingFiles(false);
+    }
+  };
+
+  const handleToggleAddFiles = () => {
+    const nextOpen = !showAddFiles;
+    setShowAddFiles(nextOpen);
+    if (nextOpen && workspace) {
+      void handleSearchContextFiles(fileSearchQuery);
+    }
+  };
+
+  const handleAddManualFile = (filePath: string) => {
+    const nextExplicit = Array.from(new Set([...manualAddedPaths, filePath]));
+    const nextExcluded = userExcludedPaths.filter((p) => p !== filePath);
+    setManualAddedPaths(nextExplicit);
+    setUserExcludedPaths(nextExcluded);
+    invalidateLocalSnapshot();
+    void buildPreview({ explicitPaths: nextExplicit, excludedPaths: nextExcluded });
+  };
+
+  const handleToggleMissingPath = (filePath: string) => {
+    setSelectedMissingPaths((prev) =>
+      prev.includes(filePath) ? prev.filter((p) => p !== filePath) : [...prev, filePath]
+    );
+  };
+
+  const handleIncludeMissingFiles = () => {
+    if (selectedMissingPaths.length === 0) return;
+    const nextExplicit = Array.from(new Set([...manualAddedPaths, ...selectedMissingPaths]));
+    const nextExcluded = userExcludedPaths.filter((p) => !selectedMissingPaths.includes(p));
+    setManualAddedPaths(nextExplicit);
+    setUserExcludedPaths(nextExcluded);
+    setMissingSuggestions([]);
+    setSelectedMissingPaths([]);
+    invalidateLocalSnapshot();
+    void buildPreview({ explicitPaths: nextExplicit, excludedPaths: nextExcluded });
   };
 
   const handleToggleApproval = async (approved: boolean) => {
@@ -537,6 +669,18 @@ export function ContextPreviewPanel() {
                 {(snapshot.budgetBytes / 1024).toFixed(0)} KB
               </span>
             </div>
+            {snapshot.coverage && (
+              <div className={styles.metaRow}>
+                <span>Coverage</span>
+                <span data-testid="ai-coverage-summary">
+                  {snapshot.coverage.includedFiles}/{snapshot.coverage.totalCandidates} candidates ·{" "}
+                  {snapshot.coverage.queryIntent}
+                  {snapshot.coverage.truncatedFiles > 0
+                    ? ` · ${snapshot.coverage.truncatedFiles} sliced`
+                    : ""}
+                </span>
+              </div>
+            )}
             {snapshot.budget && (
               <>
                 <div className={styles.metaRow}>
@@ -661,7 +805,124 @@ export function ContextPreviewPanel() {
             </div>
           )}
 
-          <div className={styles.listHeader}>Included Files ({snapshot.items.length})</div>
+          {missingSuggestions.length > 0 && (
+            <div className={styles.missingCard} data-testid="ai-missing-context-card">
+              <div className={styles.missingTitle}>
+                Missing Context Detected ({missingSuggestions.length})
+              </div>
+              <p className={styles.mutedText}>
+                Verified workspace files mentioned in the response. Selecting files rebuilds the
+                snapshot and requires fresh approval.
+              </p>
+              <ul className={styles.missingList}>
+                {missingSuggestions.map((entry) => {
+                  const filePath = entry.resolvedPath ?? entry.requestedPath;
+                  const checked = selectedMissingPaths.includes(filePath);
+                  return (
+                    <li key={filePath}>
+                      <label className={styles.checkboxRow}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleToggleMissingPath(filePath)}
+                        />
+                        <span>{filePath}</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className={styles.missingActions}>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  onClick={handleIncludeMissingFiles}
+                  disabled={busy || selectedMissingPaths.length === 0}
+                >
+                  <Plus size={12} aria-hidden="true" />
+                  <span>Include Selected Files</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => {
+                    setMissingSuggestions([]);
+                    setSelectedMissingPaths([]);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={styles.listHeaderRow}>
+            <div className={styles.listHeader}>Included Files ({snapshot.items.length})</div>
+            <button
+              type="button"
+              className={styles.compactBtn}
+              onClick={handleToggleAddFiles}
+              disabled={busy}
+              data-testid="ai-add-files-toggle"
+            >
+              <FolderPlus size={11} aria-hidden="true" />
+              <span>{showAddFiles ? "Close Picker" : "Add Files"}</span>
+            </button>
+          </div>
+
+          {showAddFiles && (
+            <div className={styles.addFilesBox} data-testid="ai-add-files-picker">
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search indexed files (e.g. quizService, routes, api.js)"
+                aria-label="Search files to add to context"
+                value={fileSearchQuery}
+                onChange={(e) => void handleSearchContextFiles(e.target.value)}
+              />
+              {searchingFiles ? (
+                <p className={styles.mutedText}>Searching workspace...</p>
+              ) : fileSearchResults.length === 0 ? (
+                <p className={styles.mutedText}>No matching indexed files.</p>
+              ) : (
+                <ul className={styles.pickerList}>
+                  {fileSearchResults.map((candidate) => {
+                    const alreadyIncluded = snapshot.items.some(
+                      (item) => item.filePath === candidate.filePath
+                    );
+                    return (
+                      <li key={candidate.filePath} className={styles.pickerRow}>
+                        <div className={styles.pickerInfo}>
+                          <span className={styles.pickerPath}>{candidate.filePath}</span>
+                          <span className={styles.pickerMeta}>
+                            {candidate.role} · {candidate.language}
+                          </span>
+                        </div>
+                        {candidate.blockedReason ? (
+                          <span className={styles.blockedTag} title={candidate.blockedReason}>
+                            Blocked
+                          </span>
+                        ) : alreadyIncluded ? (
+                          <span className={styles.pickerMeta}>Included</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.compactBtn}
+                            onClick={() => handleAddManualFile(candidate.filePath)}
+                            disabled={busy}
+                            aria-label={`Add ${candidate.filePath}`}
+                          >
+                            <Plus size={10} aria-hidden="true" />
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
           {snapshot.items.length === 0 ? (
             <p className={styles.mutedText}>
               No matching non-secret files found for this query in the indexed workspace.

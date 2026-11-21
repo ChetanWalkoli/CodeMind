@@ -18,6 +18,7 @@ export * from "./prompts/templates.js";
 export * from "./prompts/injectionBoundary.js";
 export * from "./prompts/promptComposer.js";
 export * from "./context/ranking.js";
+export * from "./context/intentAndRoles.js";
 export * from "./budget/tokenEstimator.js";
 export * from "./budget/tokenBudgeter.js";
 export * from "./security/secretScanner.js";

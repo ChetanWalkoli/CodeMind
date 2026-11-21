@@ -194,4 +194,71 @@ describe("GeminiProvider", () => {
     cancelController.abort();
     await expect(promise).rejects.toMatchObject({ code: "CANCELLED" });
   });
+
+  it("retries transient 503 errors on stream open and unwraps nested Gemini JSON error messages", async () => {
+    let attempts = 0;
+    const nested503 = Object.assign(
+      new Error(
+        JSON.stringify({
+          error: {
+            message: JSON.stringify({
+              error: {
+                code: 503,
+                message: "This model is currently experiencing high demand.",
+                status: "UNAVAILABLE"
+              }
+            }),
+            code: 503,
+            status: "Service Unavailable"
+          }
+        })
+      ),
+      { status: 503 }
+    );
+
+    const flakyStreamClient = createMockClient({
+      generateContentStream: vi.fn().mockImplementation(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw nested503;
+        }
+        async function* chunks() {
+          yield { text: "Recovered response" };
+        }
+        return chunks();
+      })
+    });
+
+    const provider = new GeminiProvider({
+      apiKey: testApiKey,
+      client: flakyStreamClient,
+      retryPolicy: { maxRetries: 2, initialDelayMs: 1, maxDelayMs: 5, backoffMultiplier: 2 },
+      sleepFn: async () => undefined
+    });
+
+    const deltas: string[] = [];
+    for await (const evt of provider.stream({ messages: [{ role: "user", content: "Hello" }] })) {
+      if (evt.type === "delta") deltas.push(evt.text);
+    }
+    expect(attempts).toBe(2);
+    expect(deltas.join("")).toBe("Recovered response");
+
+    // When retries are exhausted, nested JSON is unwrapped to a readable message
+    const always503Client = createMockClient({
+      generateContentStream: vi.fn().mockRejectedValue(nested503)
+    });
+    const noRetryProvider = new GeminiProvider({
+      apiKey: testApiKey,
+      client: always503Client,
+      retryPolicy: { maxRetries: 0, initialDelayMs: 1, maxDelayMs: 1, backoffMultiplier: 2 }
+    });
+
+    await expect(async () => {
+      for await (const _evt of noRetryProvider.stream({
+        messages: [{ role: "user", content: "Hello" }]
+      })) {
+        // noop
+      }
+    }).rejects.toThrow("This model is currently experiencing high demand.");
+  });
 });
