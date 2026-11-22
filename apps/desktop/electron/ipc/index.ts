@@ -6,7 +6,9 @@ import { createAIContextHandlers } from "./handlers/aiContext.handler.js";
 import { createAIStreamAndConversationHandlers } from "./handlers/aiConversation.handler.js";
 import { createAppHandlers, type AppRuntimeMetadata } from "./handlers/app.handler.js";
 import { CodeEngineManager, createEngineHandlers } from "./handlers/engine.handler.js";
+import { createDecisionHandlers } from "./handlers/decision.handler.js";
 import { createFileHandlers } from "./handlers/file.handler.js";
+import { createIntentHandlers } from "./handlers/intent.handler.js";
 import { createThemeHandlers } from "./handlers/theme.handler.js";
 import { createWorkspaceHandlers, type SelectFolderFn } from "./handlers/workspace.handler.js";
 import { ContextApprovalStore } from "../ai/contextApprovalStore.js";
@@ -17,6 +19,11 @@ import { AIProviderManager } from "../ai/providerManager.js";
 import { AIStreamManager, type StreamEventEmitter } from "../ai/streamManager.js";
 import { SecureTransmissionGate } from "../ai/transmissionGate.js";
 import { AIUsageStore } from "../ai/usageStore.js";
+import { DecisionManager } from "../decisions/decisionManager.js";
+import { DecisionStore } from "../decisions/decisionStore.js";
+import { IntentOrchestrator } from "../intent/intentOrchestrator.js";
+import { IntentStore } from "../intent/intentStore.js";
+import type { AtomicWriteFileFn } from "../intent/patchApplicationEngine.js";
 import type { PreferencesStore } from "../utils/preferences.js";
 import { WorkspaceFileService } from "../workspace/filesystem.js";
 import { WorkspaceAuthority } from "../workspace/pathSecurity.js";
@@ -48,6 +55,9 @@ export interface IpcRegistrationDeps {
   approvalStore?: ContextApprovalStore;
   conversationStore?: ConversationStore;
   usageStore?: AIUsageStore;
+  intentStore?: IntentStore;
+  decisionStore?: DecisionStore;
+  writeFileAtomic?: AtomicWriteFileFn;
   streamManager?: AIStreamManager;
   streamEventEmitter?: StreamEventEmitter;
   validateAIKey?: KeyValidatorFn;
@@ -94,6 +104,26 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   const approvalStore = deps.approvalStore ?? new ContextApprovalStore();
   const conversationStore = deps.conversationStore ?? new ConversationStore(os.tmpdir());
   const usageStore = deps.usageStore ?? new AIUsageStore(os.tmpdir());
+  const intentStore = deps.intentStore ?? new IntentStore(os.tmpdir());
+  const intentOrchestrator = new IntentOrchestrator({
+    authority,
+    preferences: deps.preferences,
+    engineManager,
+    providerManager,
+    store: intentStore,
+    writeFileAtomic: deps.writeFileAtomic
+  });
+  const intentHandlers = createIntentHandlers(intentOrchestrator);
+  const decisionStore = deps.decisionStore ?? new DecisionStore(os.tmpdir());
+  const decisionManager = new DecisionManager({
+    authority,
+    store: decisionStore,
+    engineManager,
+    preferences: deps.preferences,
+    intentStore,
+    providerManager
+  });
+  const decisionHandlers = createDecisionHandlers(decisionManager);
   const contextBuilder = new WorkspaceContextBuilder(authority);
   const transmissionGate = new SecureTransmissionGate({
     authority,
@@ -399,6 +429,193 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     ipcMain,
     IPC_CHANNELS.AI_GET_USAGE,
     wrapHandler(() => aiStreamConvHandlers.getUsageSummary())
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_CREATE,
+    wrapHandler((payload) => intentHandlers.createIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_LIST,
+    wrapHandler((payload) => intentHandlers.listIntents(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_GET,
+    wrapHandler((payload) => intentHandlers.getIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_CLARIFY,
+    wrapHandler((payload) => intentHandlers.clarifyIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_CANCEL,
+    wrapHandler((payload) => intentHandlers.cancelIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_DELETE,
+    wrapHandler((payload) => intentHandlers.deleteIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_INVESTIGATE,
+    wrapHandler((payload) => intentHandlers.investigateIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_ANALYZE,
+    wrapHandler((payload) => intentHandlers.analyzeIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_RECOMMEND,
+    wrapHandler((payload) => intentHandlers.recommendIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_DECIDE_RECOMMENDATION,
+    wrapHandler((payload) => intentHandlers.decideRecommendation(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_GENERATE_PATCH,
+    wrapHandler((payload) => intentHandlers.generatePatch(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_REVIEW_PATCH,
+    wrapHandler((payload) => intentHandlers.reviewPatch(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_APPROVE_PATCH_TX,
+    wrapHandler((payload) => intentHandlers.approvePatchTx(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_APPLY_PATCH_TX,
+    wrapHandler((payload) => intentHandlers.applyPatchTx(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_DISCOVER_VERIFICATION,
+    wrapHandler((payload) => intentHandlers.discoverVerification(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_RUN_VERIFICATION,
+    wrapHandler((payload) => intentHandlers.runVerification(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_CANCEL_VERIFICATION,
+    wrapHandler((payload) => intentHandlers.cancelVerification(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_CHECK_ROLLBACK,
+    wrapHandler((payload) => intentHandlers.checkRollback(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.INTENT_EXECUTE_ROLLBACK,
+    wrapHandler((payload) => intentHandlers.executeRollback(payload))
+  );
+
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_CREATE,
+    wrapHandler((payload) => decisionHandlers.createDecision(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_UPDATE,
+    wrapHandler((payload) => decisionHandlers.updateDecision(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_LIST,
+    wrapHandler((payload) => decisionHandlers.listDecisions(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_GET,
+    wrapHandler((payload) => decisionHandlers.getDecision(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_DELETE,
+    wrapHandler((payload) => decisionHandlers.deleteDecision(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_TRANSITION_STATUS,
+    wrapHandler((payload) => decisionHandlers.transitionStatus(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_CREATE_FROM_INTENT,
+    wrapHandler((payload) => decisionHandlers.createFromIntent(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_SUGGEST,
+    wrapHandler((payload) => decisionHandlers.suggestDecisions(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_DISMISS_SUGGESTION,
+    wrapHandler((payload) => decisionHandlers.dismissSuggestion(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_LINK_EVIDENCE,
+    wrapHandler((payload) => decisionHandlers.linkEvidence(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_LINK_COMMIT,
+    wrapHandler((payload) => decisionHandlers.linkCommit(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_LIST_GIT_COMMITS,
+    wrapHandler((payload) => decisionHandlers.listGitCommits(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_TIMELINE,
+    wrapHandler((payload) => decisionHandlers.getTimeline(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_SEARCH,
+    wrapHandler((payload) => decisionHandlers.searchDecisions(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_ASK_WHY,
+    wrapHandler((payload) => decisionHandlers.askWhy(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_VERIFY_ALL,
+    wrapHandler((payload) => decisionHandlers.verifyAll(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_REVALIDATE,
+    wrapHandler((payload) => decisionHandlers.revalidate(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DECISION_DETECT_CONFLICTS,
+    wrapHandler((payload) => decisionHandlers.detectConflicts(payload))
   );
 }
 

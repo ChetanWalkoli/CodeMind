@@ -25,6 +25,15 @@ export * from "./security/secretScanner.js";
 export * from "./structured/responseParser.js";
 export * from "./structured/referenceValidator.js";
 export * from "./structured/structuredService.js";
+export * from "./intent/intentStateMachine.js";
+export * from "./intent/intentParser.js";
+export * from "./intent/analysisEngine.js";
+export * from "./intent/recommendationEngine.js";
+export * from "./intent/patchEngine.js";
+export * from "./decisions/decisionStateMachine.js";
+export * from "./decisions/decisionSearch.js";
+export * from "./decisions/askWhyEngine.js";
+export * from "./decisions/decisionConflictDetector.js";
 
 /**
  * Safely parse and validate JSON structured output from an AI provider against a Zod schema.

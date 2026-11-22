@@ -1,4 +1,6 @@
 import { ArchitectureExplorer } from "../../features/architecture/components/ArchitectureExplorer";
+import { DecisionMemoryWorkspace } from "../../features/decisions/DecisionMemoryWorkspace";
+import { IntentWorkspace } from "../../features/intent/IntentWorkspace";
 import { useLayoutStore } from "../../stores/layout.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
 import { CodeEditor } from "../editor/CodeEditor";
@@ -53,6 +55,10 @@ export function Workbench() {
             <div className={styles.editorColumn}>
               {centerView === "architecture" ? (
                 <ArchitectureExplorer />
+              ) : centerView === "intent" ? (
+                <IntentWorkspace />
+              ) : centerView === "decisions" ? (
+                <DecisionMemoryWorkspace />
               ) : (
                 <>
                   <EditorTabs />

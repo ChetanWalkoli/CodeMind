@@ -5,6 +5,8 @@ import { ConversationStore } from "./ai/conversationStore.js";
 import { CredentialStore } from "./ai/credentialStore.js";
 import { AIProviderManager } from "./ai/providerManager.js";
 import { AIUsageStore } from "./ai/usageStore.js";
+import { DecisionStore } from "./decisions/decisionStore.js";
+import { IntentStore } from "./intent/intentStore.js";
 import { registerIpcHandlers, unregisterIpcHandlers } from "./ipc/index.js";
 import { PreferencesStore } from "./utils/preferences.js";
 import { createMainWindow } from "./window.js";
@@ -26,6 +28,8 @@ let credentialStore: CredentialStore | null = null;
 let aiProviderManager: AIProviderManager | null = null;
 let conversationStore: ConversationStore | null = null;
 let usageStore: AIUsageStore | null = null;
+let intentStore: IntentStore | null = null;
+let decisionStore: DecisionStore | null = null;
 const workspaceAuthority = new WorkspaceAuthority();
 const workspaceFileService = new WorkspaceFileService(workspaceAuthority);
 
@@ -62,6 +66,20 @@ function getUsageStore(): AIUsageStore {
     usageStore = new AIUsageStore(app.getPath("userData"));
   }
   return usageStore;
+}
+
+function getIntentStore(): IntentStore {
+  if (!intentStore) {
+    intentStore = new IntentStore(app.getPath("userData"));
+  }
+  return intentStore;
+}
+
+function getDecisionStore(): DecisionStore {
+  if (!decisionStore) {
+    decisionStore = new DecisionStore(app.getPath("userData"));
+  }
+  return decisionStore;
 }
 
 function getPreloadPath(): string {
@@ -140,7 +158,9 @@ app
       credentials,
       providerManager,
       conversationStore: conversations,
-      usageStore: usage
+      usageStore: usage,
+      intentStore: getIntentStore(),
+      decisionStore: getDecisionStore()
     });
 
     createWindow();

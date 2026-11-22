@@ -37,7 +37,11 @@ describe("CodeMind Desktop App integration", () => {
   beforeEach(() => {
     useEditorStore.getState().resetToInitial();
     useLayoutStore.getState().resetLayout();
-    useWorkspaceStore.setState({ activeNav: "explorer", activeBottomTab: "problems" });
+    useWorkspaceStore.setState({
+      activeNav: "explorer",
+      activeBottomTab: "problems",
+      centerView: "editor"
+    });
     useThemeStore.setState({ theme: "dark", initialized: false });
     window.localStorage.clear();
   });
@@ -63,6 +67,12 @@ describe("CodeMind Desktop App integration", () => {
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: "Intent Mode" }));
+    expect(screen.getByTestId("intent-workspace-empty")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Decision Memory" }));
+    expect(screen.getByTestId("decision-workspace-empty")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Change Impact" }));
     expect(screen.getByText("Coming in a future phase.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Collapse right panel" }));

@@ -13,7 +13,7 @@ import { useArchitectureStore } from "./architecture.store";
 import { useEditorStore } from "./editor.store";
 import { useLayoutStore } from "./layout.store";
 
-export type CenterViewMode = "editor" | "architecture";
+export type CenterViewMode = "editor" | "architecture" | "intent" | "decisions";
 
 export type NavSectionId =
   "explorer" | "search" | "graph" | "intent" | "decisions" | "impact" | "settings";
@@ -87,7 +87,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setActiveNav(nav) {
     set((state) => ({
       activeNav: nav,
-      centerView: nav === "graph" ? "architecture" : state.centerView
+      centerView:
+        nav === "graph"
+          ? "architecture"
+          : nav === "intent"
+            ? "intent"
+            : nav === "decisions"
+              ? "decisions"
+              : state.centerView
     }));
   },
 

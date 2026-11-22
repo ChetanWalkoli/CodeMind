@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CodeMindDesktopAPI } from "@codemind/shared";
 import { desktopApi, isElectronEnvironment } from "../desktopApi";
+import { createIntentBridgeStubs } from "../../test/intentMockStubs";
 
 function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMindDesktopAPI {
   return {
@@ -195,6 +196,7 @@ function createMockBridge(overrides: Partial<CodeMindDesktopAPI> = {}): CodeMind
       .fn()
       .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
     deleteAIConversation: vi.fn().mockResolvedValue({ ok: true, data: { deleted: true } }),
+    ...createIntentBridgeStubs(),
     getAIUsageSummary: vi.fn().mockResolvedValue({
       ok: true,
       data: {

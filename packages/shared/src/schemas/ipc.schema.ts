@@ -44,6 +44,36 @@ import {
   type ParseDiagnostic,
   type SymbolSearchResult
 } from "./code-engine.schema.js";
+import {
+  DecisionAlternativeSchema,
+  DecisionCategorySchema,
+  DecisionEvidenceTypeSchema,
+  DecisionLifecycleStatusSchema,
+  DecisionSourceKindSchema,
+  DecisionTradeoffSchema,
+  type AskWhyAnswer,
+  type DecisionConflict,
+  type DecisionGitReference,
+  type DecisionSearchResult,
+  type DecisionSuggestion,
+  type DecisionTimelineEntry,
+  type EngineeringDecision
+} from "./decision.schema.js";
+import {
+  InvestigationLimitsSchema,
+  PatchApprovalEntrySchema,
+  PatchReviewDecisionSchema,
+  RecommendationDecisionSchema,
+  RollbackModeSchema,
+  type IntentSession,
+  type IntentSessionSummary,
+  type PatchApprovalRecord,
+  type PatchTransactionRecord,
+  type RollbackCheckResult,
+  type RollbackRecord,
+  type VerificationCandidateCommand,
+  type VerificationRunRecord
+} from "./intent.schema.js";
 
 export const IPC_CHANNELS = {
   WORKSPACE_SELECT_FOLDER: "workspace:select-folder",
@@ -78,6 +108,43 @@ export const IPC_CHANNELS = {
   AI_CONVERSATION_RENAME: "ai:conversation-rename",
   AI_CONVERSATION_DELETE: "ai:conversation-delete",
   AI_GET_USAGE: "ai:get-usage",
+  INTENT_CREATE: "intent:create",
+  INTENT_LIST: "intent:list",
+  INTENT_GET: "intent:get",
+  INTENT_CLARIFY: "intent:clarify",
+  INTENT_CANCEL: "intent:cancel",
+  INTENT_DELETE: "intent:delete",
+  INTENT_INVESTIGATE: "intent:investigate",
+  INTENT_ANALYZE: "intent:analyze",
+  INTENT_RECOMMEND: "intent:recommend",
+  INTENT_DECIDE_RECOMMENDATION: "intent:decide-recommendation",
+  INTENT_GENERATE_PATCH: "intent:generate-patch",
+  INTENT_REVIEW_PATCH: "intent:review-patch",
+  INTENT_APPROVE_PATCH_TX: "intent:approve-patch-tx",
+  INTENT_APPLY_PATCH_TX: "intent:apply-patch-tx",
+  INTENT_DISCOVER_VERIFICATION: "intent:discover-verification",
+  INTENT_RUN_VERIFICATION: "intent:run-verification",
+  INTENT_CANCEL_VERIFICATION: "intent:cancel-verification",
+  INTENT_CHECK_ROLLBACK: "intent:check-rollback",
+  INTENT_EXECUTE_ROLLBACK: "intent:execute-rollback",
+  DECISION_CREATE: "decision:create",
+  DECISION_UPDATE: "decision:update",
+  DECISION_LIST: "decision:list",
+  DECISION_GET: "decision:get",
+  DECISION_DELETE: "decision:delete",
+  DECISION_TRANSITION_STATUS: "decision:transition-status",
+  DECISION_CREATE_FROM_INTENT: "decision:create-from-intent",
+  DECISION_SUGGEST: "decision:suggest",
+  DECISION_DISMISS_SUGGESTION: "decision:dismiss-suggestion",
+  DECISION_LINK_EVIDENCE: "decision:link-evidence",
+  DECISION_LINK_COMMIT: "decision:link-commit",
+  DECISION_LIST_GIT_COMMITS: "decision:list-git-commits",
+  DECISION_TIMELINE: "decision:timeline",
+  DECISION_SEARCH: "decision:search",
+  DECISION_ASK_WHY: "decision:ask-why",
+  DECISION_VERIFY_ALL: "decision:verify-all",
+  DECISION_REVALIDATE: "decision:revalidate",
+  DECISION_DETECT_CONFLICTS: "decision:detect-conflicts",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -557,6 +624,298 @@ export const AIExecuteApprovedResultSchema = z.object({
 
 export type AIExecuteApprovedResult = z.infer<typeof AIExecuteApprovedResultSchema>;
 
+// ============================================================================
+// Phase 6 — Intent Mode IPC Request Schemas
+// ============================================================================
+
+export const IntentCreateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  prompt: z.string().trim().min(3, "Describe your engineering goal.").max(4_000),
+  useAiRefinement: z.boolean().optional()
+});
+export type IntentCreateRequest = z.infer<typeof IntentCreateRequestSchema>;
+
+export const IntentListRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+export type IntentListRequest = z.infer<typeof IntentListRequestSchema>;
+
+export const IntentGetRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1)
+});
+export type IntentGetRequest = z.infer<typeof IntentGetRequestSchema>;
+
+export const IntentClarifyRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  answers: z.record(z.string(), z.string().trim().min(1).max(1_000)),
+  confirmedCriteriaIds: z.array(z.string().min(1)).optional()
+});
+export type IntentClarifyRequest = z.infer<typeof IntentClarifyRequestSchema>;
+
+export const IntentInvestigateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  limits: InvestigationLimitsSchema.partial().optional()
+});
+export type IntentInvestigateRequest = z.infer<typeof IntentInvestigateRequestSchema>;
+
+export const IntentAnalyzeRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  useAiReasoning: z.boolean().optional()
+});
+export type IntentAnalyzeRequest = z.infer<typeof IntentAnalyzeRequestSchema>;
+
+export const IntentRecommendRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1)
+});
+export type IntentRecommendRequest = z.infer<typeof IntentRecommendRequestSchema>;
+
+export const IntentDecideRecommendationRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  recommendationId: z.string().min(1),
+  decision: RecommendationDecisionSchema,
+  note: z.string().max(500).optional()
+});
+export type IntentDecideRecommendationRequest = z.infer<
+  typeof IntentDecideRecommendationRequestSchema
+>;
+
+export const IntentGeneratePatchRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  recommendationIds: z.array(z.string().min(1)).min(1),
+  useAiGeneration: z.boolean().optional(),
+  proposedEdits: z
+    .array(
+      z.object({
+        targetFile: z.string().min(1),
+        proposedContent: z.string(),
+        summary: z.string().min(1).optional()
+      })
+    )
+    .optional()
+});
+export type IntentGeneratePatchRequest = z.infer<typeof IntentGeneratePatchRequestSchema>;
+
+export const IntentReviewPatchRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  patchIds: z.array(z.string().min(1)).min(1),
+  decision: PatchReviewDecisionSchema
+});
+export type IntentReviewPatchRequest = z.infer<typeof IntentReviewPatchRequestSchema>;
+
+export const IntentApprovePatchTxRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  entries: z.array(PatchApprovalEntrySchema).min(1),
+  approved: z.boolean()
+});
+export type IntentApprovePatchTxRequest = z.infer<typeof IntentApprovePatchTxRequestSchema>;
+
+export const IntentApplyPatchTxRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  approvalId: z.string().min(1)
+});
+export type IntentApplyPatchTxRequest = z.infer<typeof IntentApplyPatchTxRequestSchema>;
+
+export const IntentDiscoverVerificationRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1)
+});
+export type IntentDiscoverVerificationRequest = z.infer<
+  typeof IntentDiscoverVerificationRequestSchema
+>;
+
+export const IntentRunVerificationRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  transactionId: z.string().min(1).optional(),
+  commandId: z.string().min(1),
+  approvedByUser: z.literal(true),
+  timeoutMs: z.number().int().positive().max(300_000).optional()
+});
+export type IntentRunVerificationRequest = z.infer<typeof IntentRunVerificationRequestSchema>;
+
+export const IntentCancelVerificationRequestSchema = z.object({
+  verificationId: z.string().min(1)
+});
+export type IntentCancelVerificationRequest = z.infer<typeof IntentCancelVerificationRequestSchema>;
+
+export const IntentCheckRollbackRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  transactionId: z.string().min(1),
+  targetFiles: z.array(z.string().min(1)).optional()
+});
+export type IntentCheckRollbackRequest = z.infer<typeof IntentCheckRollbackRequestSchema>;
+
+export const IntentExecuteRollbackRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  transactionId: z.string().min(1),
+  mode: RollbackModeSchema,
+  targetFiles: z.array(z.string().min(1)).optional(),
+  confirmedByUser: z.literal(true),
+  forceOverwriteModified: z.boolean().optional()
+});
+export type IntentExecuteRollbackRequest = z.infer<typeof IntentExecuteRollbackRequestSchema>;
+
+// ============================================================================
+// Phase 7 — Decision Memory IPC Request Schemas
+// ============================================================================
+
+export const DecisionEvidenceInputSchema = z.object({
+  type: DecisionEvidenceTypeSchema,
+  filePath: z.string().trim().max(400).optional(),
+  symbolName: z.string().trim().max(200).optional(),
+  startLine: z.number().int().positive().optional(),
+  endLine: z.number().int().positive().optional(),
+  commitSha: z.string().trim().max(64).optional(),
+  description: z.string().trim().min(1).max(600)
+});
+export type DecisionEvidenceInput = z.infer<typeof DecisionEvidenceInputSchema>;
+
+export const DecisionCreateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  title: z.string().trim().min(2).max(200),
+  summary: z.string().trim().max(600).optional(),
+  context: z.string().trim().max(4_000).optional(),
+  problem: z.string().trim().max(2_000).optional(),
+  decision: z.string().trim().max(4_000).optional(),
+  rationale: z.string().trim().max(4_000).optional(),
+  status: DecisionLifecycleStatusSchema.default("proposed"),
+  category: DecisionCategorySchema.default("architecture"),
+  source: DecisionSourceKindSchema.default("manual"),
+  tags: z.array(z.string().trim().min(1).max(60)).max(25).optional(),
+  alternatives: z.array(DecisionAlternativeSchema).max(20).optional(),
+  tradeoffs: z.array(DecisionTradeoffSchema).max(20).optional(),
+  evidence: z.array(DecisionEvidenceInputSchema).max(30).optional(),
+  relatedDecisionIds: z.array(z.string().min(1)).max(30).optional(),
+  relatedIntentId: z.string().min(1).nullable().optional(),
+  commitShas: z.array(z.string().trim().min(7).max(64)).max(10).optional()
+});
+export type DecisionCreateRequest = z.infer<typeof DecisionCreateRequestSchema>;
+
+export const DecisionUpdateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1),
+  title: z.string().trim().min(2).max(200).optional(),
+  summary: z.string().trim().max(600).optional(),
+  context: z.string().trim().max(4_000).optional(),
+  problem: z.string().trim().max(2_000).optional(),
+  decision: z.string().trim().max(4_000).optional(),
+  rationale: z.string().trim().max(4_000).optional(),
+  category: DecisionCategorySchema.optional(),
+  tags: z.array(z.string().trim().min(1).max(60)).max(25).optional(),
+  alternatives: z.array(DecisionAlternativeSchema).max(20).optional(),
+  tradeoffs: z.array(DecisionTradeoffSchema).max(20).optional(),
+  relatedDecisionIds: z.array(z.string().min(1)).max(30).optional()
+});
+export type DecisionUpdateRequest = z.infer<typeof DecisionUpdateRequestSchema>;
+
+export const DecisionWorkspaceRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+export type DecisionWorkspaceRequest = z.infer<typeof DecisionWorkspaceRequestSchema>;
+
+export const DecisionGetRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1)
+});
+export type DecisionGetRequest = z.infer<typeof DecisionGetRequestSchema>;
+
+export const DecisionTransitionStatusRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1),
+  nextStatus: DecisionLifecycleStatusSchema,
+  supersededById: z.string().min(1).optional(),
+  note: z.string().max(400).optional()
+});
+export type DecisionTransitionStatusRequest = z.infer<typeof DecisionTransitionStatusRequestSchema>;
+
+export const DecisionCreateFromIntentRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  intentId: z.string().min(1),
+  title: z.string().trim().min(2).max(200).optional(),
+  confirmAccepted: z.boolean().default(false)
+});
+export type DecisionCreateFromIntentRequest = z.infer<typeof DecisionCreateFromIntentRequestSchema>;
+
+export const DecisionDismissSuggestionRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  suggestionId: z.string().min(1)
+});
+export type DecisionDismissSuggestionRequest = z.infer<
+  typeof DecisionDismissSuggestionRequestSchema
+>;
+
+export const DecisionLinkEvidenceRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1),
+  evidence: DecisionEvidenceInputSchema
+});
+export type DecisionLinkEvidenceRequest = z.infer<typeof DecisionLinkEvidenceRequestSchema>;
+
+export const DecisionLinkCommitRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1),
+  commitSha: z.string().trim().min(7).max(64)
+});
+export type DecisionLinkCommitRequest = z.infer<typeof DecisionLinkCommitRequestSchema>;
+
+export const DecisionListGitCommitsRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  limit: z.number().int().positive().max(50).default(20)
+});
+export type DecisionListGitCommitsRequest = z.infer<typeof DecisionListGitCommitsRequestSchema>;
+
+export const DecisionTimelineRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  order: z.enum(["newest", "oldest"]).default("newest"),
+  category: DecisionCategorySchema.optional(),
+  status: DecisionLifecycleStatusSchema.optional(),
+  tag: z.string().trim().min(1).max(60).optional(),
+  query: z.string().trim().max(200).optional()
+});
+export type DecisionTimelineRequest = z.infer<typeof DecisionTimelineRequestSchema>;
+
+export const DecisionSearchRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  query: z.string().trim().max(300).default(""),
+  category: DecisionCategorySchema.optional(),
+  status: DecisionLifecycleStatusSchema.optional(),
+  tag: z.string().trim().max(60).optional(),
+  filePath: z.string().trim().max(400).optional(),
+  commitSha: z.string().trim().max(64).optional(),
+  onlyStale: z.boolean().optional(),
+  limit: z.number().int().positive().max(50).default(20)
+});
+export type DecisionSearchRequest = z.infer<typeof DecisionSearchRequestSchema>;
+
+export const DecisionAskWhyRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  question: z.string().trim().min(3).max(600),
+  filePath: z.string().trim().max(400).optional(),
+  symbolName: z.string().trim().max(200).optional(),
+  useAiSynthesis: z.boolean().optional()
+});
+export type DecisionAskWhyRequest = z.infer<typeof DecisionAskWhyRequestSchema>;
+
+export const DecisionRevalidateRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  decisionId: z.string().min(1),
+  updatedRationale: z.string().trim().max(4_000).optional(),
+  confirmedByDeveloper: z.literal(true)
+});
+export type DecisionRevalidateRequest = z.infer<typeof DecisionRevalidateRequestSchema>;
+
 export interface CodeMindDesktopAPI {
   getAppInfo(): Promise<IpcResponse<AppInfo>>;
   getPlatformInfo(): Promise<IpcResponse<PlatformInfo>>;
@@ -613,6 +972,75 @@ export interface CodeMindDesktopAPI {
     request: AIConversationDeleteRequest
   ): Promise<IpcResponse<{ deleted: boolean }>>;
   getAIUsageSummary(): Promise<IpcResponse<AIUsageSummary>>;
+  createIntent(request: IntentCreateRequest): Promise<IpcResponse<IntentSession>>;
+  listIntents(request: IntentListRequest): Promise<IpcResponse<IntentSessionSummary[]>>;
+  getIntent(request: IntentGetRequest): Promise<IpcResponse<IntentSession>>;
+  clarifyIntent(request: IntentClarifyRequest): Promise<IpcResponse<IntentSession>>;
+  cancelIntent(request: IntentGetRequest): Promise<IpcResponse<IntentSession>>;
+  deleteIntent(request: IntentGetRequest): Promise<IpcResponse<{ deleted: boolean }>>;
+  investigateIntent(request: IntentInvestigateRequest): Promise<IpcResponse<IntentSession>>;
+  analyzeIntent(request: IntentAnalyzeRequest): Promise<IpcResponse<IntentSession>>;
+  recommendIntent(request: IntentRecommendRequest): Promise<IpcResponse<IntentSession>>;
+  decideRecommendation(
+    request: IntentDecideRecommendationRequest
+  ): Promise<IpcResponse<IntentSession>>;
+  generateIntentPatch(request: IntentGeneratePatchRequest): Promise<IpcResponse<IntentSession>>;
+  reviewIntentPatch(request: IntentReviewPatchRequest): Promise<IpcResponse<IntentSession>>;
+  approvePatchTransaction(
+    request: IntentApprovePatchTxRequest
+  ): Promise<IpcResponse<PatchApprovalRecord>>;
+  applyPatchTransaction(
+    request: IntentApplyPatchTxRequest
+  ): Promise<IpcResponse<PatchTransactionRecord>>;
+  discoverVerificationCommands(
+    request: IntentDiscoverVerificationRequest
+  ): Promise<IpcResponse<VerificationCandidateCommand[]>>;
+  runVerificationCommand(
+    request: IntentRunVerificationRequest
+  ): Promise<IpcResponse<VerificationRunRecord>>;
+  cancelVerificationCommand(
+    request: IntentCancelVerificationRequest
+  ): Promise<IpcResponse<{ cancelled: boolean }>>;
+  checkTransactionRollback(
+    request: IntentCheckRollbackRequest
+  ): Promise<IpcResponse<RollbackCheckResult>>;
+  executeTransactionRollback(
+    request: IntentExecuteRollbackRequest
+  ): Promise<IpcResponse<RollbackRecord>>;
+  createDecision(request: DecisionCreateRequest): Promise<IpcResponse<EngineeringDecision>>;
+  updateDecision(request: DecisionUpdateRequest): Promise<IpcResponse<EngineeringDecision>>;
+  listDecisions(request: DecisionWorkspaceRequest): Promise<IpcResponse<EngineeringDecision[]>>;
+  getDecision(request: DecisionGetRequest): Promise<IpcResponse<EngineeringDecision>>;
+  deleteDecision(request: DecisionGetRequest): Promise<IpcResponse<{ deleted: boolean }>>;
+  transitionDecisionStatus(
+    request: DecisionTransitionStatusRequest
+  ): Promise<IpcResponse<EngineeringDecision>>;
+  createDecisionFromIntent(
+    request: DecisionCreateFromIntentRequest
+  ): Promise<IpcResponse<EngineeringDecision>>;
+  suggestDecisions(request: DecisionWorkspaceRequest): Promise<IpcResponse<DecisionSuggestion[]>>;
+  dismissDecisionSuggestion(
+    request: DecisionDismissSuggestionRequest
+  ): Promise<IpcResponse<{ dismissed: boolean }>>;
+  linkDecisionEvidence(
+    request: DecisionLinkEvidenceRequest
+  ): Promise<IpcResponse<EngineeringDecision>>;
+  linkDecisionCommit(request: DecisionLinkCommitRequest): Promise<IpcResponse<EngineeringDecision>>;
+  listDecisionGitCommits(
+    request: DecisionListGitCommitsRequest
+  ): Promise<IpcResponse<DecisionGitReference[]>>;
+  getDecisionTimeline(
+    request: DecisionTimelineRequest
+  ): Promise<IpcResponse<DecisionTimelineEntry[]>>;
+  searchDecisions(request: DecisionSearchRequest): Promise<IpcResponse<DecisionSearchResult[]>>;
+  askWhyDecision(request: DecisionAskWhyRequest): Promise<IpcResponse<AskWhyAnswer>>;
+  verifyAllDecisions(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<EngineeringDecision[]>>;
+  revalidateDecision(request: DecisionRevalidateRequest): Promise<IpcResponse<EngineeringDecision>>;
+  detectDecisionConflicts(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<DecisionConflict[]>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;

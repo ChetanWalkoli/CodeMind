@@ -21,6 +21,20 @@ import {
   type AISetModelRequest,
   type AIValidateKeyRequest,
   type CodeMindDesktopAPI,
+  type DecisionAskWhyRequest,
+  type DecisionCreateFromIntentRequest,
+  type DecisionCreateRequest,
+  type DecisionDismissSuggestionRequest,
+  type DecisionGetRequest,
+  type DecisionLinkCommitRequest,
+  type DecisionLinkEvidenceRequest,
+  type DecisionListGitCommitsRequest,
+  type DecisionRevalidateRequest,
+  type DecisionSearchRequest,
+  type DecisionTimelineRequest,
+  type DecisionTransitionStatusRequest,
+  type DecisionUpdateRequest,
+  type DecisionWorkspaceRequest,
   type EngineFileIntelRequest,
   type EngineGraphRequest,
   type EngineIndexRequest,
@@ -29,6 +43,23 @@ import {
   type FileStatRequest,
   type FileWriteRequest,
   type GitStatusRequest,
+  type IntentAnalyzeRequest,
+  type IntentApplyPatchTxRequest,
+  type IntentApprovePatchTxRequest,
+  type IntentCancelVerificationRequest,
+  type IntentCheckRollbackRequest,
+  type IntentClarifyRequest,
+  type IntentCreateRequest,
+  type IntentDecideRecommendationRequest,
+  type IntentDiscoverVerificationRequest,
+  type IntentExecuteRollbackRequest,
+  type IntentGeneratePatchRequest,
+  type IntentGetRequest,
+  type IntentInvestigateRequest,
+  type IntentListRequest,
+  type IntentRecommendRequest,
+  type IntentReviewPatchRequest,
+  type IntentRunVerificationRequest,
   type SetThemeRequest,
   type WorkspaceOpenRequest,
   type WorkspaceSearchRequest,
@@ -118,7 +149,80 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
     ipcRenderer.invoke(IPC_CHANNELS.AI_CONVERSATION_RENAME, request),
   deleteAIConversation: (request: AIConversationDeleteRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_CONVERSATION_DELETE, request),
-  getAIUsageSummary: () => ipcRenderer.invoke(IPC_CHANNELS.AI_GET_USAGE)
+  getAIUsageSummary: () => ipcRenderer.invoke(IPC_CHANNELS.AI_GET_USAGE),
+  createIntent: (request: IntentCreateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_CREATE, request),
+  listIntents: (request: IntentListRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_LIST, request),
+  getIntent: (request: IntentGetRequest) => ipcRenderer.invoke(IPC_CHANNELS.INTENT_GET, request),
+  clarifyIntent: (request: IntentClarifyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_CLARIFY, request),
+  cancelIntent: (request: IntentGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_CANCEL, request),
+  deleteIntent: (request: IntentGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_DELETE, request),
+  investigateIntent: (request: IntentInvestigateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_INVESTIGATE, request),
+  analyzeIntent: (request: IntentAnalyzeRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_ANALYZE, request),
+  recommendIntent: (request: IntentRecommendRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_RECOMMEND, request),
+  decideRecommendation: (request: IntentDecideRecommendationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_DECIDE_RECOMMENDATION, request),
+  generateIntentPatch: (request: IntentGeneratePatchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_GENERATE_PATCH, request),
+  reviewIntentPatch: (request: IntentReviewPatchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_REVIEW_PATCH, request),
+  approvePatchTransaction: (request: IntentApprovePatchTxRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_APPROVE_PATCH_TX, request),
+  applyPatchTransaction: (request: IntentApplyPatchTxRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_APPLY_PATCH_TX, request),
+  discoverVerificationCommands: (request: IntentDiscoverVerificationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_DISCOVER_VERIFICATION, request),
+  runVerificationCommand: (request: IntentRunVerificationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_RUN_VERIFICATION, request),
+  cancelVerificationCommand: (request: IntentCancelVerificationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_CANCEL_VERIFICATION, request),
+  checkTransactionRollback: (request: IntentCheckRollbackRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_CHECK_ROLLBACK, request),
+  executeTransactionRollback: (request: IntentExecuteRollbackRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.INTENT_EXECUTE_ROLLBACK, request),
+  createDecision: (request: DecisionCreateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_CREATE, request),
+  updateDecision: (request: DecisionUpdateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_UPDATE, request),
+  listDecisions: (request: DecisionWorkspaceRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_LIST, request),
+  getDecision: (request: DecisionGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_GET, request),
+  deleteDecision: (request: DecisionGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_DELETE, request),
+  transitionDecisionStatus: (request: DecisionTransitionStatusRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_TRANSITION_STATUS, request),
+  createDecisionFromIntent: (request: DecisionCreateFromIntentRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_CREATE_FROM_INTENT, request),
+  suggestDecisions: (request: DecisionWorkspaceRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_SUGGEST, request),
+  dismissDecisionSuggestion: (request: DecisionDismissSuggestionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_DISMISS_SUGGESTION, request),
+  linkDecisionEvidence: (request: DecisionLinkEvidenceRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_LINK_EVIDENCE, request),
+  linkDecisionCommit: (request: DecisionLinkCommitRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_LINK_COMMIT, request),
+  listDecisionGitCommits: (request: DecisionListGitCommitsRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_LIST_GIT_COMMITS, request),
+  getDecisionTimeline: (request: DecisionTimelineRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_TIMELINE, request),
+  searchDecisions: (request: DecisionSearchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_SEARCH, request),
+  askWhyDecision: (request: DecisionAskWhyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_ASK_WHY, request),
+  verifyAllDecisions: (request: DecisionWorkspaceRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_VERIFY_ALL, request),
+  revalidateDecision: (request: DecisionRevalidateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_REVALIDATE, request),
+  detectDecisionConflicts: (request: DecisionWorkspaceRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_DETECT_CONFLICTS, request)
 });
 
 contextBridge.exposeInMainWorld("codemindDesktop", desktopApi);

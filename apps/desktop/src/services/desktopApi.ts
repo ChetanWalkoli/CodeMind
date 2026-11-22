@@ -33,7 +33,28 @@ import {
   type ContextSearchCandidate,
   type ConversationPage,
   type ConversationSummary,
+  type AskWhyAnswer,
+  type DecisionAskWhyRequest,
+  type DecisionConflict,
+  type DecisionCreateFromIntentRequest,
+  type DecisionCreateRequest,
+  type DecisionDismissSuggestionRequest,
+  type DecisionGetRequest,
+  type DecisionGitReference,
+  type DecisionLinkCommitRequest,
+  type DecisionLinkEvidenceRequest,
+  type DecisionListGitCommitsRequest,
+  type DecisionRevalidateRequest,
+  type DecisionSearchRequest,
+  type DecisionSearchResult,
+  type DecisionSuggestion,
+  type DecisionTimelineEntry,
+  type DecisionTimelineRequest,
+  type DecisionTransitionStatusRequest,
+  type DecisionUpdateRequest,
+  type DecisionWorkspaceRequest,
   type DependencyGraphSnapshot,
+  type EngineeringDecision,
   type ResolvedMissingFile,
   type EngineFileIntelRequest,
   type EngineGraphRequest,
@@ -52,6 +73,31 @@ import {
   type GitStatusRequest,
   type HealthCheckResponse,
   type IndexSummary,
+  type IntentAnalyzeRequest,
+  type IntentApplyPatchTxRequest,
+  type IntentApprovePatchTxRequest,
+  type IntentCancelVerificationRequest,
+  type IntentCheckRollbackRequest,
+  type IntentClarifyRequest,
+  type IntentCreateRequest,
+  type IntentDecideRecommendationRequest,
+  type IntentDiscoverVerificationRequest,
+  type IntentExecuteRollbackRequest,
+  type IntentGeneratePatchRequest,
+  type IntentGetRequest,
+  type IntentInvestigateRequest,
+  type IntentListRequest,
+  type IntentRecommendRequest,
+  type IntentReviewPatchRequest,
+  type IntentRunVerificationRequest,
+  type IntentSession,
+  type IntentSessionSummary,
+  type PatchApprovalRecord,
+  type PatchTransactionRecord,
+  type RollbackCheckResult,
+  type RollbackRecord,
+  type VerificationCandidateCommand,
+  type VerificationRunRecord,
   type IpcResponse,
   type PlatformInfo,
   type SymbolSearchResult,
@@ -780,5 +826,455 @@ export const desktopApi = {
       };
     }
     return safeInvoke(() => bridge.getAIUsageSummary(), "BRIDGE_AI_USAGE_GET_FAILED");
+  },
+
+  async createIntent(request: IntentCreateRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Intent Mode requires the CodeMind desktop application."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.createIntent(request), "BRIDGE_INTENT_CREATE_FAILED");
+  },
+
+  async listIntents(request: IntentListRequest): Promise<IpcResponse<IntentSessionSummary[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.listIntents(request), "BRIDGE_INTENT_LIST_FAILED");
+  },
+
+  async getIntent(request: IntentGetRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.getIntent(request), "BRIDGE_INTENT_GET_FAILED");
+  },
+
+  async clarifyIntent(request: IntentClarifyRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.clarifyIntent(request), "BRIDGE_INTENT_CLARIFY_FAILED");
+  },
+
+  async cancelIntent(request: IntentGetRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.cancelIntent(request), "BRIDGE_INTENT_CANCEL_FAILED");
+  },
+
+  async deleteIntent(request: IntentGetRequest): Promise<IpcResponse<{ deleted: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.deleteIntent(request), "BRIDGE_INTENT_DELETE_FAILED");
+  },
+
+  async investigateIntent(request: IntentInvestigateRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.investigateIntent(request), "BRIDGE_INTENT_INVESTIGATE_FAILED");
+  },
+
+  async analyzeIntent(request: IntentAnalyzeRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.analyzeIntent(request), "BRIDGE_INTENT_ANALYZE_FAILED");
+  },
+
+  async recommendIntent(request: IntentRecommendRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.recommendIntent(request), "BRIDGE_INTENT_RECOMMEND_FAILED");
+  },
+
+  async decideRecommendation(
+    request: IntentDecideRecommendationRequest
+  ): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.decideRecommendation(request),
+      "BRIDGE_INTENT_DECIDE_RECOMMENDATION_FAILED"
+    );
+  },
+
+  async generateIntentPatch(
+    request: IntentGeneratePatchRequest
+  ): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.generateIntentPatch(request),
+      "BRIDGE_INTENT_GENERATE_PATCH_FAILED"
+    );
+  },
+
+  async reviewIntentPatch(request: IntentReviewPatchRequest): Promise<IpcResponse<IntentSession>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.reviewIntentPatch(request), "BRIDGE_INTENT_REVIEW_PATCH_FAILED");
+  },
+
+  async approvePatchTransaction(
+    request: IntentApprovePatchTxRequest
+  ): Promise<IpcResponse<PatchApprovalRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.approvePatchTransaction(request),
+      "BRIDGE_INTENT_APPROVE_PATCH_TX_FAILED"
+    );
+  },
+
+  async applyPatchTransaction(
+    request: IntentApplyPatchTxRequest
+  ): Promise<IpcResponse<PatchTransactionRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.applyPatchTransaction(request),
+      "BRIDGE_INTENT_APPLY_PATCH_TX_FAILED"
+    );
+  },
+
+  async discoverVerificationCommands(
+    request: IntentDiscoverVerificationRequest
+  ): Promise<IpcResponse<VerificationCandidateCommand[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(
+      () => bridge.discoverVerificationCommands(request),
+      "BRIDGE_INTENT_DISCOVER_VERIFICATION_FAILED"
+    );
+  },
+
+  async runVerificationCommand(
+    request: IntentRunVerificationRequest
+  ): Promise<IpcResponse<VerificationRunRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.runVerificationCommand(request),
+      "BRIDGE_INTENT_RUN_VERIFICATION_FAILED"
+    );
+  },
+
+  async cancelVerificationCommand(
+    request: IntentCancelVerificationRequest
+  ): Promise<IpcResponse<{ cancelled: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: { cancelled: false } };
+    return safeInvoke(
+      () => bridge.cancelVerificationCommand(request),
+      "BRIDGE_INTENT_CANCEL_VERIFICATION_FAILED"
+    );
+  },
+
+  async checkTransactionRollback(
+    request: IntentCheckRollbackRequest
+  ): Promise<IpcResponse<RollbackCheckResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.checkTransactionRollback(request),
+      "BRIDGE_INTENT_CHECK_ROLLBACK_FAILED"
+    );
+  },
+
+  async executeTransactionRollback(
+    request: IntentExecuteRollbackRequest
+  ): Promise<IpcResponse<RollbackRecord>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Intent Mode requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.executeTransactionRollback(request),
+      "BRIDGE_INTENT_EXECUTE_ROLLBACK_FAILED"
+    );
+  },
+
+  async createDecision(request: DecisionCreateRequest): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.createDecision(request), "BRIDGE_DECISION_CREATE_FAILED");
+  },
+
+  async updateDecision(request: DecisionUpdateRequest): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.updateDecision(request), "BRIDGE_DECISION_UPDATE_FAILED");
+  },
+
+  async listDecisions(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<EngineeringDecision[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.listDecisions(request), "BRIDGE_DECISION_LIST_FAILED");
+  },
+
+  async getDecision(request: DecisionGetRequest): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.getDecision(request), "BRIDGE_DECISION_GET_FAILED");
+  },
+
+  async deleteDecision(request: DecisionGetRequest): Promise<IpcResponse<{ deleted: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.deleteDecision(request), "BRIDGE_DECISION_DELETE_FAILED");
+  },
+
+  async transitionDecisionStatus(
+    request: DecisionTransitionStatusRequest
+  ): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.transitionDecisionStatus(request),
+      "BRIDGE_DECISION_TRANSITION_FAILED"
+    );
+  },
+
+  async createDecisionFromIntent(
+    request: DecisionCreateFromIntentRequest
+  ): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.createDecisionFromIntent(request),
+      "BRIDGE_DECISION_FROM_INTENT_FAILED"
+    );
+  },
+
+  async suggestDecisions(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<DecisionSuggestion[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.suggestDecisions(request), "BRIDGE_DECISION_SUGGEST_FAILED");
+  },
+
+  async dismissDecisionSuggestion(
+    request: DecisionDismissSuggestionRequest
+  ): Promise<IpcResponse<{ dismissed: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: { dismissed: true } };
+    return safeInvoke(
+      () => bridge.dismissDecisionSuggestion(request),
+      "BRIDGE_DECISION_DISMISS_SUGGESTION_FAILED"
+    );
+  },
+
+  async linkDecisionEvidence(
+    request: DecisionLinkEvidenceRequest
+  ): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.linkDecisionEvidence(request),
+      "BRIDGE_DECISION_LINK_EVIDENCE_FAILED"
+    );
+  },
+
+  async linkDecisionCommit(
+    request: DecisionLinkCommitRequest
+  ): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.linkDecisionCommit(request),
+      "BRIDGE_DECISION_LINK_COMMIT_FAILED"
+    );
+  },
+
+  async listDecisionGitCommits(
+    request: DecisionListGitCommitsRequest
+  ): Promise<IpcResponse<DecisionGitReference[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(
+      () => bridge.listDecisionGitCommits(request),
+      "BRIDGE_DECISION_LIST_COMMITS_FAILED"
+    );
+  },
+
+  async getDecisionTimeline(
+    request: DecisionTimelineRequest
+  ): Promise<IpcResponse<DecisionTimelineEntry[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.getDecisionTimeline(request), "BRIDGE_DECISION_TIMELINE_FAILED");
+  },
+
+  async searchDecisions(
+    request: DecisionSearchRequest
+  ): Promise<IpcResponse<DecisionSearchResult[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.searchDecisions(request), "BRIDGE_DECISION_SEARCH_FAILED");
+  },
+
+  async askWhyDecision(request: DecisionAskWhyRequest): Promise<IpcResponse<AskWhyAnswer>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.askWhyDecision(request), "BRIDGE_DECISION_ASK_WHY_FAILED");
+  },
+
+  async verifyAllDecisions(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<EngineeringDecision[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.verifyAllDecisions(request), "BRIDGE_DECISION_VERIFY_FAILED");
+  },
+
+  async revalidateDecision(
+    request: DecisionRevalidateRequest
+  ): Promise<IpcResponse<EngineeringDecision>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Decision Memory requires the desktop app." }
+      };
+    }
+    return safeInvoke(
+      () => bridge.revalidateDecision(request),
+      "BRIDGE_DECISION_REVALIDATE_FAILED"
+    );
+  },
+
+  async detectDecisionConflicts(
+    request: DecisionWorkspaceRequest
+  ): Promise<IpcResponse<DecisionConflict[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(
+      () => bridge.detectDecisionConflicts(request),
+      "BRIDGE_DECISION_CONFLICTS_FAILED"
+    );
   }
 };

@@ -1,5 +1,7 @@
 import { ArchitectureOverviewPanel } from "../../features/architecture/components/ArchitectureOverviewPanel";
+import { DecisionSidebarPanel } from "../../features/decisions/DecisionSidebarPanel";
 import { FileExplorer } from "../../features/explorer/FileExplorer";
+import { IntentSidebarPanel } from "../../features/intent/IntentSidebarPanel";
 import { FileSearchPanel } from "../../features/search/FileSearchPanel";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
 import { useLayoutStore } from "../../stores/layout.store";
@@ -56,11 +58,15 @@ export function Sidebar() {
         {activeNav === "explorer" && <FileExplorer />}
         {activeNav === "search" && <FileSearchPanel />}
         {activeNav === "graph" && <ArchitectureOverviewPanel />}
+        {activeNav === "intent" && <IntentSidebarPanel />}
+        {activeNav === "decisions" && <DecisionSidebarPanel />}
         {activeNav === "settings" && <SettingsPanel />}
 
         {activeNav !== "explorer" &&
           activeNav !== "search" &&
           activeNav !== "graph" &&
+          activeNav !== "intent" &&
+          activeNav !== "decisions" &&
           activeNav !== "settings" && (
             <div className={styles.emptyCard}>
               <p className={styles.emptyTitle}>Coming in a future phase.</p>

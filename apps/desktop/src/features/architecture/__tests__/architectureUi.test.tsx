@@ -8,6 +8,7 @@ import { useEditorStore } from "../../../stores/editor.store";
 import { useLayoutStore } from "../../../stores/layout.store";
 import { useThemeStore } from "../../../stores/theme.store";
 import { useWorkspaceStore } from "../../../stores/workspace.store";
+import { createIntentBridgeStubs } from "../../../test/intentMockStubs";
 
 vi.mock("../../../components/editor/monacoSetup", () => ({
   ensureMonacoConfigured: vi.fn()
@@ -288,6 +289,7 @@ describe("Phase 4 Architecture Explorer & Source Navigation", () => {
         .fn()
         .mockResolvedValue({ ok: false, error: { code: "NOOP", message: "noop" } }),
       deleteAIConversation: vi.fn().mockResolvedValue({ ok: true, data: { deleted: true } }),
+      ...createIntentBridgeStubs(),
       getAIUsageSummary: vi.fn().mockResolvedValue({
         ok: true,
         data: {
