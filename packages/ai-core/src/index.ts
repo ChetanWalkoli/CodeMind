@@ -34,6 +34,10 @@ export * from "./decisions/decisionStateMachine.js";
 export * from "./decisions/decisionSearch.js";
 export * from "./decisions/askWhyEngine.js";
 export * from "./decisions/decisionConflictDetector.js";
+export * from "./impact/dependencyImpactAnalyzer.js";
+export * from "./impact/contractImpactAnalyzer.js";
+export * from "./impact/testAndDecisionImpact.js";
+export * from "./impact/riskAndValidationEngine.js";
 
 /**
  * Safely parse and validate JSON structured output from an AI provider against a Zod schema.

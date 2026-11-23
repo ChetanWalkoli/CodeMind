@@ -60,6 +60,13 @@ import {
   type EngineeringDecision
 } from "./decision.schema.js";
 import {
+  ImpactAnalysisRequestSchema,
+  ImpactValidationStepStatusSchema,
+  type ImpactAnalysisRequest,
+  type ImpactAnalysisResult,
+  type ImpactAnalysisSummary
+} from "./impact.schema.js";
+import {
   InvestigationLimitsSchema,
   PatchApprovalEntrySchema,
   PatchReviewDecisionSchema,
@@ -145,6 +152,13 @@ export const IPC_CHANNELS = {
   DECISION_VERIFY_ALL: "decision:verify-all",
   DECISION_REVALIDATE: "decision:revalidate",
   DECISION_DETECT_CONFLICTS: "decision:detect-conflicts",
+  IMPACT_ANALYZE: "impact:analyze",
+  IMPACT_ANALYZE_GIT_DIFF: "impact:analyze-git-diff",
+  IMPACT_GET: "impact:get",
+  IMPACT_LIST: "impact:list",
+  IMPACT_CHECK_FRESHNESS: "impact:check-freshness",
+  IMPACT_UPDATE_VALIDATION: "impact:update-validation",
+  IMPACT_DELETE: "impact:delete",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -916,6 +930,38 @@ export const DecisionRevalidateRequestSchema = z.object({
 });
 export type DecisionRevalidateRequest = z.infer<typeof DecisionRevalidateRequestSchema>;
 
+// ============================================================================
+// Phase 8 — Change Impact Intelligence IPC Request Schemas
+// ============================================================================
+
+export const ImpactAnalyzeGitDiffRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  maxDepth: z.number().int().min(1).max(5).default(3),
+  maxAffectedFiles: z.number().int().min(5).max(150).default(50)
+});
+export type ImpactAnalyzeGitDiffRequest = z.infer<typeof ImpactAnalyzeGitDiffRequestSchema>;
+
+export const ImpactGetRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  analysisId: z.string().min(1)
+});
+export type ImpactGetRequest = z.infer<typeof ImpactGetRequestSchema>;
+
+export const ImpactListRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+export type ImpactListRequest = z.infer<typeof ImpactListRequestSchema>;
+
+export const ImpactUpdateValidationRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  analysisId: z.string().min(1),
+  stepId: z.string().min(1),
+  status: ImpactValidationStepStatusSchema
+});
+export type ImpactUpdateValidationRequest = z.infer<typeof ImpactUpdateValidationRequestSchema>;
+
+export { ImpactAnalysisRequestSchema, type ImpactAnalysisRequest };
+
 export interface CodeMindDesktopAPI {
   getAppInfo(): Promise<IpcResponse<AppInfo>>;
   getPlatformInfo(): Promise<IpcResponse<PlatformInfo>>;
@@ -1041,6 +1087,17 @@ export interface CodeMindDesktopAPI {
   detectDecisionConflicts(
     request: DecisionWorkspaceRequest
   ): Promise<IpcResponse<DecisionConflict[]>>;
+  analyzeChangeImpact(request: ImpactAnalysisRequest): Promise<IpcResponse<ImpactAnalysisResult>>;
+  analyzeGitDiffImpact(
+    request: ImpactAnalyzeGitDiffRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>>;
+  getImpactAnalysis(request: ImpactGetRequest): Promise<IpcResponse<ImpactAnalysisResult>>;
+  listImpactAnalyses(request: ImpactListRequest): Promise<IpcResponse<ImpactAnalysisSummary[]>>;
+  checkImpactFreshness(request: ImpactGetRequest): Promise<IpcResponse<ImpactAnalysisResult>>;
+  updateImpactValidationStep(
+    request: ImpactUpdateValidationRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>>;
+  deleteImpactAnalysis(request: ImpactGetRequest): Promise<IpcResponse<{ deleted: boolean }>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;

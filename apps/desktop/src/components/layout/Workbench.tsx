@@ -1,5 +1,6 @@
 import { ArchitectureExplorer } from "../../features/architecture/components/ArchitectureExplorer";
 import { DecisionMemoryWorkspace } from "../../features/decisions/DecisionMemoryWorkspace";
+import { ImpactWorkspace } from "../../features/impact/ImpactWorkspace";
 import { IntentWorkspace } from "../../features/intent/IntentWorkspace";
 import { useLayoutStore } from "../../stores/layout.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
@@ -59,6 +60,8 @@ export function Workbench() {
                 <IntentWorkspace />
               ) : centerView === "decisions" ? (
                 <DecisionMemoryWorkspace />
+              ) : centerView === "impact" ? (
+                <ImpactWorkspace />
               ) : (
                 <>
                   <EditorTabs />

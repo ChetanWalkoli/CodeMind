@@ -13,7 +13,7 @@ import { useArchitectureStore } from "./architecture.store";
 import { useEditorStore } from "./editor.store";
 import { useLayoutStore } from "./layout.store";
 
-export type CenterViewMode = "editor" | "architecture" | "intent" | "decisions";
+export type CenterViewMode = "editor" | "architecture" | "intent" | "decisions" | "impact";
 
 export type NavSectionId =
   "explorer" | "search" | "graph" | "intent" | "decisions" | "impact" | "settings";
@@ -94,7 +94,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             ? "intent"
             : nav === "decisions"
               ? "decisions"
-              : state.centerView
+              : nav === "impact"
+                ? "impact"
+                : state.centerView
     }));
   },
 

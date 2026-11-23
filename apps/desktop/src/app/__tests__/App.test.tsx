@@ -73,7 +73,7 @@ describe("CodeMind Desktop App integration", () => {
     expect(screen.getByTestId("decision-workspace-empty")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Change Impact" }));
-    expect(screen.getByText("Coming in a future phase.")).toBeInTheDocument();
+    expect(screen.getByTestId("impact-workspace-empty")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Collapse right panel" }));
     expect(screen.queryByTestId("workbench-right-panel")).not.toBeInTheDocument();

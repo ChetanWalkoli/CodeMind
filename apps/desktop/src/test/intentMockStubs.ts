@@ -44,6 +44,13 @@ export function createIntentBridgeStubs() {
     askWhyDecision: vi.fn().mockResolvedValue(NOOP_ERR),
     verifyAllDecisions: vi.fn().mockResolvedValue({ ok: true as const, data: [] }),
     revalidateDecision: vi.fn().mockResolvedValue(NOOP_ERR),
-    detectDecisionConflicts: vi.fn().mockResolvedValue({ ok: true as const, data: [] })
+    detectDecisionConflicts: vi.fn().mockResolvedValue({ ok: true as const, data: [] }),
+    analyzeChangeImpact: vi.fn().mockResolvedValue(NOOP_ERR),
+    analyzeGitDiffImpact: vi.fn().mockResolvedValue(NOOP_ERR),
+    getImpactAnalysis: vi.fn().mockResolvedValue(NOOP_ERR),
+    listImpactAnalyses: vi.fn().mockResolvedValue({ ok: true as const, data: [] }),
+    checkImpactFreshness: vi.fn().mockResolvedValue(NOOP_ERR),
+    updateImpactValidationStep: vi.fn().mockResolvedValue(NOOP_ERR),
+    deleteImpactAnalysis: vi.fn().mockResolvedValue({ ok: true as const, data: { deleted: true } })
   };
 }

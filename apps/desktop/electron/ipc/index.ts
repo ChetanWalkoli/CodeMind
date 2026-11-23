@@ -8,6 +8,7 @@ import { createAppHandlers, type AppRuntimeMetadata } from "./handlers/app.handl
 import { CodeEngineManager, createEngineHandlers } from "./handlers/engine.handler.js";
 import { createDecisionHandlers } from "./handlers/decision.handler.js";
 import { createFileHandlers } from "./handlers/file.handler.js";
+import { createImpactHandlers } from "./handlers/impact.handler.js";
 import { createIntentHandlers } from "./handlers/intent.handler.js";
 import { createThemeHandlers } from "./handlers/theme.handler.js";
 import { createWorkspaceHandlers, type SelectFolderFn } from "./handlers/workspace.handler.js";
@@ -21,9 +22,12 @@ import { SecureTransmissionGate } from "../ai/transmissionGate.js";
 import { AIUsageStore } from "../ai/usageStore.js";
 import { DecisionManager } from "../decisions/decisionManager.js";
 import { DecisionStore } from "../decisions/decisionStore.js";
+import { ImpactManager } from "../impact/impactManager.js";
+import { ImpactStore } from "../impact/impactStore.js";
 import { IntentOrchestrator } from "../intent/intentOrchestrator.js";
 import { IntentStore } from "../intent/intentStore.js";
 import type { AtomicWriteFileFn } from "../intent/patchApplicationEngine.js";
+import { VerificationEngine } from "../intent/verificationEngine.js";
 import type { PreferencesStore } from "../utils/preferences.js";
 import { WorkspaceFileService } from "../workspace/filesystem.js";
 import { WorkspaceAuthority } from "../workspace/pathSecurity.js";
@@ -57,6 +61,7 @@ export interface IpcRegistrationDeps {
   usageStore?: AIUsageStore;
   intentStore?: IntentStore;
   decisionStore?: DecisionStore;
+  impactStore?: ImpactStore;
   writeFileAtomic?: AtomicWriteFileFn;
   streamManager?: AIStreamManager;
   streamEventEmitter?: StreamEventEmitter;
@@ -124,6 +129,16 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     providerManager
   });
   const decisionHandlers = createDecisionHandlers(decisionManager);
+  const impactStore = deps.impactStore ?? new ImpactStore(os.tmpdir());
+  const verificationEngine = new VerificationEngine(authority);
+  const impactManager = new ImpactManager({
+    workspaceAuthority: authority,
+    impactStore,
+    decisionManager,
+    verificationEngine,
+    getIndexer: (workspaceRoot) => engineManager.get(workspaceRoot)
+  });
+  const impactHandlers = createImpactHandlers(impactManager);
   const contextBuilder = new WorkspaceContextBuilder(authority);
   const transmissionGate = new SecureTransmissionGate({
     authority,
@@ -616,6 +631,41 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     ipcMain,
     IPC_CHANNELS.DECISION_DETECT_CONFLICTS,
     wrapHandler((payload) => decisionHandlers.detectConflicts(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_ANALYZE,
+    wrapHandler((payload) => impactHandlers.analyze(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_ANALYZE_GIT_DIFF,
+    wrapHandler((payload) => impactHandlers.analyzeGitDiff(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_GET,
+    wrapHandler((payload) => impactHandlers.get(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_LIST,
+    wrapHandler((payload) => impactHandlers.list(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_CHECK_FRESHNESS,
+    wrapHandler((payload) => impactHandlers.checkFreshness(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_UPDATE_VALIDATION,
+    wrapHandler((payload) => impactHandlers.updateValidation(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.IMPACT_DELETE,
+    wrapHandler((payload) => impactHandlers.delete(payload))
   );
 }
 

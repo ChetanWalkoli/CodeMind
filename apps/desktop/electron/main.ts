@@ -6,6 +6,7 @@ import { CredentialStore } from "./ai/credentialStore.js";
 import { AIProviderManager } from "./ai/providerManager.js";
 import { AIUsageStore } from "./ai/usageStore.js";
 import { DecisionStore } from "./decisions/decisionStore.js";
+import { ImpactStore } from "./impact/impactStore.js";
 import { IntentStore } from "./intent/intentStore.js";
 import { registerIpcHandlers, unregisterIpcHandlers } from "./ipc/index.js";
 import { PreferencesStore } from "./utils/preferences.js";
@@ -80,6 +81,15 @@ function getDecisionStore(): DecisionStore {
     decisionStore = new DecisionStore(app.getPath("userData"));
   }
   return decisionStore;
+}
+
+let impactStore: ImpactStore | null = null;
+
+function getImpactStore(): ImpactStore {
+  if (!impactStore) {
+    impactStore = new ImpactStore(app.getPath("userData"));
+  }
+  return impactStore;
 }
 
 function getPreloadPath(): string {
@@ -160,7 +170,8 @@ app
       conversationStore: conversations,
       usageStore: usage,
       intentStore: getIntentStore(),
-      decisionStore: getDecisionStore()
+      decisionStore: getDecisionStore(),
+      impactStore: getImpactStore()
     });
 
     createWindow();

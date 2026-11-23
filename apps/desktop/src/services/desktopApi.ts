@@ -87,6 +87,13 @@ import {
   type IntentGetRequest,
   type IntentInvestigateRequest,
   type IntentListRequest,
+  type ImpactAnalysisRequest,
+  type ImpactAnalysisResult,
+  type ImpactAnalysisSummary,
+  type ImpactAnalyzeGitDiffRequest,
+  type ImpactGetRequest,
+  type ImpactListRequest,
+  type ImpactUpdateValidationRequest,
   type IntentRecommendRequest,
   type IntentReviewPatchRequest,
   type IntentRunVerificationRequest,
@@ -1276,5 +1283,102 @@ export const desktopApi = {
       () => bridge.detectDecisionConflicts(request),
       "BRIDGE_DECISION_CONFLICTS_FAILED"
     );
+  },
+
+  async analyzeChangeImpact(
+    request: ImpactAnalysisRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Change Impact analysis requires the desktop app."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.analyzeChangeImpact(request), "BRIDGE_IMPACT_ANALYZE_FAILED");
+  },
+
+  async analyzeGitDiffImpact(
+    request: ImpactAnalyzeGitDiffRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Change Impact analysis requires the desktop app."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.analyzeGitDiffImpact(request), "BRIDGE_IMPACT_GIT_DIFF_FAILED");
+  },
+
+  async getImpactAnalysis(request: ImpactGetRequest): Promise<IpcResponse<ImpactAnalysisResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Change Impact analysis requires the desktop app."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getImpactAnalysis(request), "BRIDGE_IMPACT_GET_FAILED");
+  },
+
+  async listImpactAnalyses(
+    request: ImpactListRequest
+  ): Promise<IpcResponse<ImpactAnalysisSummary[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.listImpactAnalyses(request), "BRIDGE_IMPACT_LIST_FAILED");
+  },
+
+  async checkImpactFreshness(
+    request: ImpactGetRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Change Impact analysis requires the desktop app."
+        }
+      };
+    }
+    return safeInvoke(() => bridge.checkImpactFreshness(request), "BRIDGE_IMPACT_FRESHNESS_FAILED");
+  },
+
+  async updateImpactValidationStep(
+    request: ImpactUpdateValidationRequest
+  ): Promise<IpcResponse<ImpactAnalysisResult>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: {
+          code: "ELECTRON_REQUIRED",
+          message: "Change Impact analysis requires the desktop app."
+        }
+      };
+    }
+    return safeInvoke(
+      () => bridge.updateImpactValidationStep(request),
+      "BRIDGE_IMPACT_UPDATE_VALIDATION_FAILED"
+    );
+  },
+
+  async deleteImpactAnalysis(
+    request: ImpactGetRequest
+  ): Promise<IpcResponse<{ deleted: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: { deleted: false } };
+    return safeInvoke(() => bridge.deleteImpactAnalysis(request), "BRIDGE_IMPACT_DELETE_FAILED");
   }
 };

@@ -1,6 +1,7 @@
 import { ArchitectureOverviewPanel } from "../../features/architecture/components/ArchitectureOverviewPanel";
 import { DecisionSidebarPanel } from "../../features/decisions/DecisionSidebarPanel";
 import { FileExplorer } from "../../features/explorer/FileExplorer";
+import { ImpactSidebarPanel } from "../../features/impact/ImpactSidebarPanel";
 import { IntentSidebarPanel } from "../../features/intent/IntentSidebarPanel";
 import { FileSearchPanel } from "../../features/search/FileSearchPanel";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
@@ -60,19 +61,8 @@ export function Sidebar() {
         {activeNav === "graph" && <ArchitectureOverviewPanel />}
         {activeNav === "intent" && <IntentSidebarPanel />}
         {activeNav === "decisions" && <DecisionSidebarPanel />}
+        {activeNav === "impact" && <ImpactSidebarPanel />}
         {activeNav === "settings" && <SettingsPanel />}
-
-        {activeNav !== "explorer" &&
-          activeNav !== "search" &&
-          activeNav !== "graph" &&
-          activeNav !== "intent" &&
-          activeNav !== "decisions" &&
-          activeNav !== "settings" && (
-            <div className={styles.emptyCard}>
-              <p className={styles.emptyTitle}>Coming in a future phase.</p>
-              <p className={styles.emptyText}>{meta.futureDescription}</p>
-            </div>
-          )}
       </div>
     </aside>
   );

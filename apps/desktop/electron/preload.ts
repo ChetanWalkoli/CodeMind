@@ -52,6 +52,11 @@ import {
   type IntentCreateRequest,
   type IntentDecideRecommendationRequest,
   type IntentDiscoverVerificationRequest,
+  type ImpactAnalysisRequest,
+  type ImpactAnalyzeGitDiffRequest,
+  type ImpactGetRequest,
+  type ImpactListRequest,
+  type ImpactUpdateValidationRequest,
   type IntentExecuteRollbackRequest,
   type IntentGeneratePatchRequest,
   type IntentGetRequest,
@@ -222,7 +227,21 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
   revalidateDecision: (request: DecisionRevalidateRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.DECISION_REVALIDATE, request),
   detectDecisionConflicts: (request: DecisionWorkspaceRequest) =>
-    ipcRenderer.invoke(IPC_CHANNELS.DECISION_DETECT_CONFLICTS, request)
+    ipcRenderer.invoke(IPC_CHANNELS.DECISION_DETECT_CONFLICTS, request),
+  analyzeChangeImpact: (request: ImpactAnalysisRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_ANALYZE, request),
+  analyzeGitDiffImpact: (request: ImpactAnalyzeGitDiffRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_ANALYZE_GIT_DIFF, request),
+  getImpactAnalysis: (request: ImpactGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_GET, request),
+  listImpactAnalyses: (request: ImpactListRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_LIST, request),
+  checkImpactFreshness: (request: ImpactGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_CHECK_FRESHNESS, request),
+  updateImpactValidationStep: (request: ImpactUpdateValidationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_UPDATE_VALIDATION, request),
+  deleteImpactAnalysis: (request: ImpactGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_DELETE, request)
 });
 
 contextBridge.exposeInMainWorld("codemindDesktop", desktopApi);
