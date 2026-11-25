@@ -1,6 +1,7 @@
 import os from "node:os";
 import { IPC_CHANNELS, type IpcResponse } from "@codemind/shared";
 import { APPROVED_IPC_CHANNELS, type ApprovedIpcChannel } from "./channels.js";
+import { createActivityAndDiagnosticsHandlers } from "./handlers/activity.handler.js";
 import { createAIConfigHandlers, type KeyValidatorFn } from "./handlers/aiConfig.handler.js";
 import { createAIContextHandlers } from "./handlers/aiContext.handler.js";
 import { createAIStreamAndConversationHandlers } from "./handlers/aiConversation.handler.js";
@@ -12,6 +13,7 @@ import { createImpactHandlers } from "./handlers/impact.handler.js";
 import { createIntentHandlers } from "./handlers/intent.handler.js";
 import { createThemeHandlers } from "./handlers/theme.handler.js";
 import { createWorkspaceHandlers, type SelectFolderFn } from "./handlers/workspace.handler.js";
+import { ActivityStore } from "../activity/activityStore.js";
 import { ContextApprovalStore } from "../ai/contextApprovalStore.js";
 import { WorkspaceContextBuilder } from "../ai/contextBuilder.js";
 import { ConversationStore } from "../ai/conversationStore.js";
@@ -62,6 +64,7 @@ export interface IpcRegistrationDeps {
   intentStore?: IntentStore;
   decisionStore?: DecisionStore;
   impactStore?: ImpactStore;
+  activityStore?: ActivityStore;
   writeFileAtomic?: AtomicWriteFileFn;
   streamManager?: AIStreamManager;
   streamEventEmitter?: StreamEventEmitter;
@@ -139,6 +142,24 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     getIndexer: (workspaceRoot) => engineManager.get(workspaceRoot)
   });
   const impactHandlers = createImpactHandlers(impactManager);
+  const activityStore = deps.activityStore ?? new ActivityStore(os.tmpdir());
+  const activityHandlers = createActivityAndDiagnosticsHandlers({
+    authority,
+    activityStore,
+    preferences: deps.preferences,
+    metadata: deps.metadata,
+    engineManager,
+    credentials,
+    decisionStore,
+    impactStore
+  });
+  const recordSafeActivity = (input: Parameters<ActivityStore["record"]>[0]): void => {
+    try {
+      activityStore.record(input);
+    } catch {
+      // Activity recording must never break primary workflows
+    }
+  };
   const contextBuilder = new WorkspaceContextBuilder(authority);
   const transmissionGate = new SecureTransmissionGate({
     authority,
@@ -236,7 +257,18 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.WORKSPACE_OPEN,
-    wrapHandler((payload) => workspaceHandlers.openWorkspace(payload))
+    wrapHandler(async (payload) => {
+      const res = await workspaceHandlers.openWorkspace(payload);
+      if (res.ok) {
+        recordSafeActivity({
+          workspaceRoot: res.data.rootPath,
+          eventType: "workspace_opened",
+          feature: "workspace",
+          summary: `Opened workspace "${res.data.name}".`
+        });
+      }
+      return res;
+    })
   );
 
   registerSafe(
@@ -272,7 +304,18 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.ENGINE_INDEX_WORKSPACE,
-    wrapHandler((payload) => engineHandlers.indexWorkspace(payload))
+    wrapHandler(async (payload) => {
+      const res = await engineHandlers.indexWorkspace(payload);
+      if (res.ok) {
+        recordSafeActivity({
+          workspaceRoot: res.data.workspaceRoot,
+          eventType: "codebase_indexed",
+          feature: "understand",
+          summary: `Indexed ${res.data.indexedFiles} files and ${res.data.totalSymbols} symbols (${res.data.durationMs}ms).`
+        });
+      }
+      return res;
+    })
   );
 
   registerSafe(
@@ -545,7 +588,23 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.DECISION_CREATE,
-    wrapHandler((payload) => decisionHandlers.createDecision(payload))
+    wrapHandler(async (payload) => {
+      const res = await decisionHandlers.createDecision(payload);
+      if (res.ok && payload && typeof payload === "object" && "workspaceRoot" in payload) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType: res.data.status === "accepted" ? "decision_accepted" : "decision_drafted",
+          feature: "remember",
+          relatedRecordId: res.data.id,
+          relatedFiles: res.data.evidence
+            .map((e) => e.filePath)
+            .filter((p): p is string => Boolean(p)),
+          summary: `Decision "${res.data.title}" recorded (${res.data.status}).`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
@@ -570,12 +629,47 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.DECISION_TRANSITION_STATUS,
-    wrapHandler((payload) => decisionHandlers.transitionStatus(payload))
+    wrapHandler(async (payload) => {
+      const res = await decisionHandlers.transitionStatus(payload);
+      if (res.ok && payload && typeof payload === "object" && "workspaceRoot" in payload) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        const eventType =
+          res.data.status === "superseded"
+            ? "decision_superseded"
+            : res.data.status === "accepted"
+              ? "decision_accepted"
+              : "decision_drafted";
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType,
+          feature: "remember",
+          relatedRecordId: res.data.id,
+          summary: `Decision "${res.data.title}" transitioned to ${res.data.status}.`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
     IPC_CHANNELS.DECISION_CREATE_FROM_INTENT,
-    wrapHandler((payload) => decisionHandlers.createFromIntent(payload))
+    wrapHandler(async (payload) => {
+      const res = await decisionHandlers.createFromIntent(payload);
+      if (res.ok && payload && typeof payload === "object" && "workspaceRoot" in payload) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType: "decision_drafted",
+          feature: "remember",
+          relatedRecordId: res.data.id,
+          relatedFiles: res.data.evidence
+            .map((e) => e.filePath)
+            .filter((p): p is string => Boolean(p)),
+          summary: `Draft decision "${res.data.title}" captured from Intent Mode.`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
@@ -635,12 +729,40 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.IMPACT_ANALYZE,
-    wrapHandler((payload) => impactHandlers.analyze(payload))
+    wrapHandler(async (payload) => {
+      const res = await impactHandlers.analyze(payload);
+      if (res.ok && payload && typeof payload === "object" && "workspaceRoot" in payload) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType: "impact_completed",
+          feature: "predict",
+          relatedRecordId: res.data.analysisId,
+          relatedFiles: res.data.analyzedTargets.map((t) => t.filePath),
+          summary: `Impact analysis completed (${res.data.risk.level} risk ${res.data.risk.score}/100, ${res.data.impactedFiles.length} impacted files).`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
     IPC_CHANNELS.IMPACT_ANALYZE_GIT_DIFF,
-    wrapHandler((payload) => impactHandlers.analyzeGitDiff(payload))
+    wrapHandler(async (payload) => {
+      const res = await impactHandlers.analyzeGitDiff(payload);
+      if (res.ok && payload && typeof payload === "object" && "workspaceRoot" in payload) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType: "impact_completed",
+          feature: "predict",
+          relatedRecordId: res.data.analysisId,
+          relatedFiles: res.data.analyzedTargets.map((t) => t.filePath),
+          summary: `Git diff impact analysis completed (${res.data.risk.level} risk ${res.data.risk.score}/100).`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
@@ -655,7 +777,28 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
   registerSafe(
     ipcMain,
     IPC_CHANNELS.IMPACT_CHECK_FRESHNESS,
-    wrapHandler((payload) => impactHandlers.checkFreshness(payload))
+    wrapHandler(async (payload) => {
+      const res = await impactHandlers.checkFreshness(payload);
+      if (
+        res.ok &&
+        res.data.status === "stale" &&
+        payload &&
+        typeof payload === "object" &&
+        "workspaceRoot" in payload
+      ) {
+        const ws = String((payload as { workspaceRoot: string }).workspaceRoot);
+        recordSafeActivity({
+          workspaceRoot: authority.getAuthorizedRoot(ws),
+          eventType: "impact_stale",
+          feature: "predict",
+          relatedRecordId: res.data.analysisId,
+          relatedFiles: res.data.staleFiles,
+          status: "warning",
+          summary: `Impact report marked stale (${res.data.staleFiles.length} changed evidence item(s)).`
+        });
+      }
+      return res;
+    })
   );
   registerSafe(
     ipcMain,
@@ -666,6 +809,31 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, deps: IpcRegistrationD
     ipcMain,
     IPC_CHANNELS.IMPACT_DELETE,
     wrapHandler((payload) => impactHandlers.delete(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ACTIVITY_LIST,
+    wrapHandler((payload) => activityHandlers.listActivity(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.ACTIVITY_CLEAR,
+    wrapHandler((payload) => activityHandlers.clearActivity(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.PREFERENCES_GET,
+    wrapHandler(() => activityHandlers.getAppPreferences())
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.PREFERENCES_UPDATE,
+    wrapHandler((payload) => activityHandlers.updateAppPreferences(payload))
+  );
+  registerSafe(
+    ipcMain,
+    IPC_CHANNELS.DIAGNOSTICS_GET,
+    wrapHandler((payload) => activityHandlers.getDiagnostics(payload))
   );
 }
 

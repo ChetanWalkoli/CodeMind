@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from "electron";
 import path from "node:path";
 import { APP_CONSTANTS } from "@codemind/config";
+import { ActivityStore } from "./activity/activityStore.js";
 import { ConversationStore } from "./ai/conversationStore.js";
 import { CredentialStore } from "./ai/credentialStore.js";
 import { AIProviderManager } from "./ai/providerManager.js";
@@ -92,6 +93,15 @@ function getImpactStore(): ImpactStore {
   return impactStore;
 }
 
+let activityStore: ActivityStore | null = null;
+
+function getActivityStore(): ActivityStore {
+  if (!activityStore) {
+    activityStore = new ActivityStore(app.getPath("userData"));
+  }
+  return activityStore;
+}
+
 function getPreloadPath(): string {
   return path.join(__dirname, "preload.cjs");
 }
@@ -171,7 +181,8 @@ app
       usageStore: usage,
       intentStore: getIntentStore(),
       decisionStore: getDecisionStore(),
-      impactStore: getImpactStore()
+      impactStore: getImpactStore(),
+      activityStore: getActivityStore()
     });
 
     createWindow();

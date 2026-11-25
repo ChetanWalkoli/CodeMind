@@ -1,6 +1,10 @@
 import { useState } from "react";
 import type { ImpactCategory, ImpactRiskLevel, ImpactValidationStepStatus } from "@codemind/shared";
-import { useEditorStore } from "../../stores/editor.store";
+import {
+  launchIntentFromContext,
+  navigateToDecisionRecord,
+  navigateToEvidence
+} from "../../services/evidenceNavigation";
 import { useImpactStore, type ImpactWorkspaceTab } from "../../stores/impact.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
 import { ImpactGraph } from "./ImpactGraph";
@@ -21,8 +25,6 @@ function riskClass(level: ImpactRiskLevel): string {
 
 export function ImpactWorkspace() {
   const workspaceRoot = useWorkspaceStore((s) => s.workspace?.rootPath ?? null);
-  const setCenterView = useWorkspaceStore((s) => s.setCenterView);
-  const openWorkspaceFile = useEditorStore((s) => s.openWorkspaceFile);
 
   const {
     activeAnalysis,
@@ -42,8 +44,7 @@ export function ImpactWorkspace() {
 
   const handleOpenFile = (filePath: string, line?: number) => {
     if (!workspaceRoot) return;
-    void openWorkspaceFile(workspaceRoot, filePath, line ? { line } : undefined);
-    setCenterView("editor");
+    void navigateToEvidence({ workspaceRoot, filePath, line });
   };
 
   if (!activeAnalysis) {
@@ -132,6 +133,19 @@ export function ImpactWorkspace() {
           <div className={styles.buttonRow}>
             {workspaceRoot && (
               <>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() =>
+                    void launchIntentFromContext({
+                      workspaceRoot,
+                      goal: `Address ${activeAnalysis.risk.level} risk (${activeAnalysis.risk.score}/100) impact for ${activeAnalysis.analyzedTargets.map((t) => t.filePath).join(", ")}`
+                    })
+                  }
+                  data-testid="impact-create-intent-btn"
+                >
+                  Create Intent Task
+                </button>
                 <button
                   type="button"
                   className={styles.secondaryBtn}
@@ -460,6 +474,15 @@ export function ImpactWorkspace() {
                     <span>Category: {dec.category}</span>
                     <span>Status: {dec.status}</span>
                     <span>Verification: {dec.verificationStatus}</span>
+                    {workspaceRoot && (
+                      <button
+                        type="button"
+                        className={styles.smallBtn}
+                        onClick={() => void navigateToDecisionRecord(workspaceRoot, dec.decisionId)}
+                      >
+                        Open Decision
+                      </button>
+                    )}
                   </div>
                   {dec.matchedFiles.length > 0 && (
                     <div className={styles.buttonRow}>

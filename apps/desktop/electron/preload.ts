@@ -52,6 +52,10 @@ import {
   type IntentCreateRequest,
   type IntentDecideRecommendationRequest,
   type IntentDiscoverVerificationRequest,
+  type ActivityClearRequest,
+  type ActivityListRequest,
+  type AppPreferencesPatch,
+  type DiagnosticsGetRequest,
   type ImpactAnalysisRequest,
   type ImpactAnalyzeGitDiffRequest,
   type ImpactGetRequest,
@@ -241,7 +245,16 @@ const desktopApi: CodeMindDesktopAPI = Object.freeze({
   updateImpactValidationStep: (request: ImpactUpdateValidationRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.IMPACT_UPDATE_VALIDATION, request),
   deleteImpactAnalysis: (request: ImpactGetRequest) =>
-    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_DELETE, request)
+    ipcRenderer.invoke(IPC_CHANNELS.IMPACT_DELETE, request),
+  listActivityEvents: (request: ActivityListRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ACTIVITY_LIST, request),
+  clearActivityEvents: (request: ActivityClearRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ACTIVITY_CLEAR, request),
+  getAppPreferences: () => ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_GET),
+  updateAppPreferences: (patch: AppPreferencesPatch) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PREFERENCES_UPDATE, patch),
+  getDiagnostics: (request?: DiagnosticsGetRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DIAGNOSTICS_GET, request)
 });
 
 contextBridge.exposeInMainWorld("codemindDesktop", desktopApi);

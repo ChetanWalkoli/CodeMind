@@ -1,5 +1,13 @@
 import { z } from "zod";
 import {
+  ActivityFeatureSchema,
+  AppPreferencesPatchSchema,
+  type ActivityEvent,
+  type AppPreferences,
+  type AppPreferencesPatch,
+  type DiagnosticsSnapshot
+} from "./activity.schema.js";
+import {
   AIContextApprovalRecordSchema,
   AIContextSnapshotSchema,
   AIStreamIpcEventSchema,
@@ -159,6 +167,11 @@ export const IPC_CHANNELS = {
   IMPACT_CHECK_FRESHNESS: "impact:check-freshness",
   IMPACT_UPDATE_VALIDATION: "impact:update-validation",
   IMPACT_DELETE: "impact:delete",
+  ACTIVITY_LIST: "activity:list",
+  ACTIVITY_CLEAR: "activity:clear",
+  PREFERENCES_GET: "preferences:get",
+  PREFERENCES_UPDATE: "preferences:update",
+  DIAGNOSTICS_GET: "diagnostics:get",
   FILE_READ: "file:read",
   FILE_WRITE: "file:write",
   FILE_STAT: "file:stat",
@@ -962,6 +975,30 @@ export type ImpactUpdateValidationRequest = z.infer<typeof ImpactUpdateValidatio
 
 export { ImpactAnalysisRequestSchema, type ImpactAnalysisRequest };
 
+// ============================================================================
+// Phase 9 — Activity, App Preferences & Diagnostics IPC Request Schemas
+// ============================================================================
+
+export const ActivityListRequestSchema = z.object({
+  workspaceRoot: z.string().min(1),
+  feature: ActivityFeatureSchema.optional(),
+  query: z.string().trim().max(200).optional(),
+  limit: z.number().int().min(1).max(200).default(100)
+});
+export type ActivityListRequest = z.infer<typeof ActivityListRequestSchema>;
+
+export const ActivityClearRequestSchema = z.object({
+  workspaceRoot: z.string().min(1)
+});
+export type ActivityClearRequest = z.infer<typeof ActivityClearRequestSchema>;
+
+export const DiagnosticsGetRequestSchema = z.object({
+  workspaceRoot: z.string().min(1).optional()
+});
+export type DiagnosticsGetRequest = z.infer<typeof DiagnosticsGetRequestSchema>;
+
+export { AppPreferencesPatchSchema, type AppPreferencesPatch };
+
 export interface CodeMindDesktopAPI {
   getAppInfo(): Promise<IpcResponse<AppInfo>>;
   getPlatformInfo(): Promise<IpcResponse<PlatformInfo>>;
@@ -1098,6 +1135,11 @@ export interface CodeMindDesktopAPI {
     request: ImpactUpdateValidationRequest
   ): Promise<IpcResponse<ImpactAnalysisResult>>;
   deleteImpactAnalysis(request: ImpactGetRequest): Promise<IpcResponse<{ deleted: boolean }>>;
+  listActivityEvents(request: ActivityListRequest): Promise<IpcResponse<ActivityEvent[]>>;
+  clearActivityEvents(request: ActivityClearRequest): Promise<IpcResponse<{ cleared: boolean }>>;
+  getAppPreferences(): Promise<IpcResponse<AppPreferences>>;
+  updateAppPreferences(patch: AppPreferencesPatch): Promise<IpcResponse<AppPreferences>>;
+  getDiagnostics(request?: DiagnosticsGetRequest): Promise<IpcResponse<DiagnosticsSnapshot>>;
   readFile(request: FileReadRequest): Promise<IpcResponse<FileReadResult>>;
   writeFile(request: FileWriteRequest): Promise<IpcResponse<FileWriteResult>>;
   statFile(request: FileStatRequest): Promise<IpcResponse<FileStatResult>>;

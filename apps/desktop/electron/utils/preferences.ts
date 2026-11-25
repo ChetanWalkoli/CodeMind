@@ -3,9 +3,14 @@ import path from "node:path";
 import { z } from "zod";
 import {
   AIProviderNameSchema,
+  APP_PREFERENCES_SCHEMA_VERSION,
+  AppPreferencesPatchSchema,
+  AppPreferencesSchema,
   ThemePreferenceSchema,
   WorkspaceSessionSchema,
   type AIProviderName,
+  type AppPreferences,
+  type AppPreferencesPatch,
   type ThemePreference,
   type WorkspaceSession
 } from "@codemind/shared";
@@ -29,10 +34,20 @@ const DEFAULT_WORKSPACE_SESSION: WorkspaceSession = {
   customExcludes: []
 };
 
+const DEFAULT_APP_PREFERENCES: AppPreferences = {
+  schemaVersion: APP_PREFERENCES_SCHEMA_VERSION,
+  editorFontSize: 13,
+  reopenLastWorkspace: true,
+  onboardingCompleted: false,
+  confirmBeforePatchApply: true,
+  confirmBeforeCommandRun: true
+};
+
 const PreferencesFileSchema = z.object({
   theme: ThemePreferenceSchema.default("dark"),
   workspaceSession: WorkspaceSessionSchema.default(DEFAULT_WORKSPACE_SESSION),
-  aiSettings: AISettingsSchema.default(DEFAULT_AI_SETTINGS)
+  aiSettings: AISettingsSchema.default(DEFAULT_AI_SETTINGS),
+  appPreferences: AppPreferencesSchema.default(DEFAULT_APP_PREFERENCES)
 });
 
 export type StoredPreferences = z.infer<typeof PreferencesFileSchema>;
@@ -40,7 +55,8 @@ export type StoredPreferences = z.infer<typeof PreferencesFileSchema>;
 const DEFAULT_PREFERENCES: StoredPreferences = {
   theme: "dark",
   workspaceSession: { ...DEFAULT_WORKSPACE_SESSION },
-  aiSettings: { ...DEFAULT_AI_SETTINGS }
+  aiSettings: { ...DEFAULT_AI_SETTINGS },
+  appPreferences: { ...DEFAULT_APP_PREFERENCES }
 };
 
 /**
@@ -57,7 +73,8 @@ export class PreferencesStore {
     const fallback = (): StoredPreferences => ({
       theme: DEFAULT_PREFERENCES.theme,
       workspaceSession: { ...DEFAULT_WORKSPACE_SESSION },
-      aiSettings: { ...DEFAULT_AI_SETTINGS }
+      aiSettings: { ...DEFAULT_AI_SETTINGS },
+      appPreferences: { ...DEFAULT_APP_PREFERENCES }
     });
 
     try {
@@ -87,10 +104,12 @@ export class PreferencesStore {
         const obj = parsedJson as Record<string, unknown>;
         const theme = ThemePreferenceSchema.safeParse(obj.theme);
         const ws = WorkspaceSessionSchema.safeParse(obj.workspaceSession);
+        const appPrefs = AppPreferencesSchema.safeParse(obj.appPreferences);
         const migrated: StoredPreferences = {
           theme: theme.success ? theme.data : DEFAULT_PREFERENCES.theme,
           workspaceSession: ws.success ? ws.data : { ...DEFAULT_WORKSPACE_SESSION },
-          aiSettings: { ...DEFAULT_AI_SETTINGS }
+          aiSettings: { ...DEFAULT_AI_SETTINGS },
+          appPreferences: appPrefs.success ? appPrefs.data : { ...DEFAULT_APP_PREFERENCES }
         };
         this.write(migrated);
         return migrated;
@@ -151,5 +170,25 @@ export class PreferencesStore {
       aiSettings: validated
     });
     return validated;
+  }
+
+  public getAppPreferences(): AppPreferences {
+    return this.read().appPreferences;
+  }
+
+  public updateAppPreferences(patch: AppPreferencesPatch): AppPreferences {
+    const validatedPatch = AppPreferencesPatchSchema.parse(patch);
+    const current = this.read();
+    const next: AppPreferences = AppPreferencesSchema.parse({
+      ...current.appPreferences,
+      ...validatedPatch,
+      confirmBeforePatchApply: true,
+      confirmBeforeCommandRun: true
+    });
+    this.write({
+      ...current,
+      appPreferences: next
+    });
+    return next;
   }
 }

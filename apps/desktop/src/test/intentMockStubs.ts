@@ -51,6 +51,31 @@ export function createIntentBridgeStubs() {
     listImpactAnalyses: vi.fn().mockResolvedValue({ ok: true as const, data: [] }),
     checkImpactFreshness: vi.fn().mockResolvedValue(NOOP_ERR),
     updateImpactValidationStep: vi.fn().mockResolvedValue(NOOP_ERR),
-    deleteImpactAnalysis: vi.fn().mockResolvedValue({ ok: true as const, data: { deleted: true } })
+    deleteImpactAnalysis: vi.fn().mockResolvedValue({ ok: true as const, data: { deleted: true } }),
+    listActivityEvents: vi.fn().mockResolvedValue({ ok: true as const, data: [] }),
+    clearActivityEvents: vi.fn().mockResolvedValue({ ok: true as const, data: { cleared: true } }),
+    getAppPreferences: vi.fn().mockResolvedValue({
+      ok: true as const,
+      data: {
+        schemaVersion: 1 as const,
+        editorFontSize: 13,
+        reopenLastWorkspace: true,
+        onboardingCompleted: true,
+        confirmBeforePatchApply: true,
+        confirmBeforeCommandRun: true
+      }
+    }),
+    updateAppPreferences: vi.fn().mockResolvedValue({
+      ok: true as const,
+      data: {
+        schemaVersion: 1 as const,
+        editorFontSize: 13,
+        reopenLastWorkspace: true,
+        onboardingCompleted: true,
+        confirmBeforePatchApply: true,
+        confirmBeforeCommandRun: true
+      }
+    }),
+    getDiagnostics: vi.fn().mockResolvedValue(NOOP_ERR)
   };
 }

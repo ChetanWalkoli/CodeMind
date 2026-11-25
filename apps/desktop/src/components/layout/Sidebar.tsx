@@ -1,3 +1,4 @@
+import { ActivitySidebarPanel } from "../../features/activity/ActivityWorkspace";
 import { ArchitectureOverviewPanel } from "../../features/architecture/components/ArchitectureOverviewPanel";
 import { DecisionSidebarPanel } from "../../features/decisions/DecisionSidebarPanel";
 import { FileExplorer } from "../../features/explorer/FileExplorer";
@@ -9,27 +10,15 @@ import { useLayoutStore } from "../../stores/layout.store";
 import { useWorkspaceStore, type NavSectionId } from "../../stores/workspace.store";
 import styles from "./Sidebar.module.scss";
 
-const SECTION_META: Record<NavSectionId, { title: string; futureDescription?: string }> = {
+const SECTION_META: Record<NavSectionId, { title: string }> = {
+  overview: { title: "Workspace Overview" },
   explorer: { title: "Explorer" },
   search: { title: "Search" },
-  graph: {
-    title: "Codebase Graph",
-    futureDescription:
-      "Interactive dependency and architecture graphs are coming in a future phase."
-  },
-  intent: {
-    title: "Intent Mode",
-    futureDescription:
-      "Evidence-based optimization plans and reviewed diffs are coming in a future phase."
-  },
-  decisions: {
-    title: "Decision Memory",
-    futureDescription: "Searchable engineering decision history is coming in a future phase."
-  },
-  impact: {
-    title: "Change Impact",
-    futureDescription: "Pre-edit dependency and impact analysis is coming in a future phase."
-  },
+  graph: { title: "Codebase Graph" },
+  intent: { title: "Intent Mode" },
+  decisions: { title: "Decision Memory" },
+  impact: { title: "Change Impact" },
+  activity: { title: "Activity" },
   settings: { title: "Settings" }
 };
 
@@ -56,12 +45,13 @@ export function Sidebar() {
       </div>
 
       <div className={styles.body}>
-        {activeNav === "explorer" && <FileExplorer />}
+        {(activeNav === "explorer" || activeNav === "overview") && <FileExplorer />}
         {activeNav === "search" && <FileSearchPanel />}
         {activeNav === "graph" && <ArchitectureOverviewPanel />}
         {activeNav === "intent" && <IntentSidebarPanel />}
         {activeNav === "decisions" && <DecisionSidebarPanel />}
         {activeNav === "impact" && <ImpactSidebarPanel />}
+        {activeNav === "activity" && <ActivitySidebarPanel />}
         {activeNav === "settings" && <SettingsPanel />}
       </div>
     </aside>

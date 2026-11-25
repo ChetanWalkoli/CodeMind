@@ -1,7 +1,9 @@
 import {
+  Activity,
   BookMarked,
   Files,
   GitBranch,
+  Home,
   Network,
   Search,
   Settings,
@@ -19,6 +21,7 @@ interface NavItem {
 }
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
+  { id: "overview", label: "Overview", icon: Home },
   { id: "explorer", label: "Explorer", icon: Files },
   { id: "search", label: "Search", icon: Search },
   { id: "graph", label: "Codebase Graph", icon: Network },
@@ -27,7 +30,10 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { id: "impact", label: "Change Impact", icon: GitBranch }
 ];
 
-const FOOTER_NAV_ITEMS: NavItem[] = [{ id: "settings", label: "Settings", icon: Settings }];
+const FOOTER_NAV_ITEMS: NavItem[] = [
+  { id: "activity", label: "Activity", icon: Activity },
+  { id: "settings", label: "Settings", icon: Settings }
+];
 
 export function ActivityBar() {
   const activeNav = useWorkspaceStore((s) => s.activeNav);

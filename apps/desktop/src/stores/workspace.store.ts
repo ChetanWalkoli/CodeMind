@@ -9,14 +9,27 @@ import type {
   WorkspaceSession
 } from "@codemind/shared";
 import { desktopApi } from "../services/desktopApi";
+import { useActivityStore } from "./activity.store";
 import { useArchitectureStore } from "./architecture.store";
+import { useDecisionStore } from "./decision.store";
 import { useEditorStore } from "./editor.store";
+import { useImpactStore } from "./impact.store";
+import { useIntentStore } from "./intent.store";
 import { useLayoutStore } from "./layout.store";
 
-export type CenterViewMode = "editor" | "architecture" | "intent" | "decisions" | "impact";
+export type CenterViewMode =
+  "overview" | "editor" | "architecture" | "intent" | "decisions" | "impact" | "activity";
 
 export type NavSectionId =
-  "explorer" | "search" | "graph" | "intent" | "decisions" | "impact" | "settings";
+  | "overview"
+  | "explorer"
+  | "search"
+  | "graph"
+  | "intent"
+  | "decisions"
+  | "impact"
+  | "activity"
+  | "settings";
 
 export type BottomPanelTabId = "problems" | "output" | "terminal";
 
@@ -88,15 +101,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       activeNav: nav,
       centerView:
-        nav === "graph"
-          ? "architecture"
-          : nav === "intent"
-            ? "intent"
-            : nav === "decisions"
-              ? "decisions"
-              : nav === "impact"
-                ? "impact"
-                : state.centerView
+        nav === "overview"
+          ? "overview"
+          : nav === "graph"
+            ? "architecture"
+            : nav === "intent"
+              ? "intent"
+              : nav === "decisions"
+                ? "decisions"
+                : nav === "impact"
+                  ? "impact"
+                  : nav === "activity"
+                    ? "activity"
+                    : state.centerView
     }));
   },
 
@@ -177,8 +194,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       workspaceError: treeRes.ok ? null : treeRes.error.message
     });
 
-    // Clear sample scratch tabs & previous architecture state when switching into a real workspace.
+    // Clear sample scratch tabs & previous workspace-specific state across all pillars when switching workspaces.
     useArchitectureStore.getState().clear();
+    useIntentStore.getState().resetForWorkspace();
+    useDecisionStore.getState().resetForWorkspace();
+    useImpactStore.getState().reset();
+    useActivityStore.getState().reset();
     const editorStore = useEditorStore.getState();
     editorStore.clearWorkspaceTabs();
 

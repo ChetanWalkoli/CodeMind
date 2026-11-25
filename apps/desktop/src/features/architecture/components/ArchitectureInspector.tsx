@@ -1,4 +1,6 @@
-import { ArrowUpRight, X } from "lucide-react";
+import { ArrowUpRight, GitBranch, Sparkles, X } from "lucide-react";
+import { launchIntentFromContext } from "../../../services/evidenceNavigation";
+import { useImpactStore } from "../../../stores/impact.store";
 import type { CodeSymbol } from "@codemind/shared";
 import { useArchitectureStore } from "../../../stores/architecture.store";
 import { useEditorStore } from "../../../stores/editor.store";
@@ -74,6 +76,37 @@ export function ArchitectureInspector() {
         >
           <ArrowUpRight size={13} aria-hidden="true" />
           <span>Open File in Editor</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.itemBtn}
+          onClick={() =>
+            void launchIntentFromContext({
+              workspaceRoot: workspace.rootPath,
+              goal: `Investigate and improve ${selectedNodeId}`
+            })
+          }
+          data-testid="arch-improve-in-intent-btn"
+        >
+          <Sparkles size={13} aria-hidden="true" />
+          <span>Improve in Intent Mode</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.itemBtn}
+          onClick={() => {
+            useWorkspaceStore.getState().setActiveNav("impact");
+            void useImpactStore.getState().analyzeFiles({
+              workspaceRoot: workspace.rootPath,
+              filePaths: [selectedNodeId]
+            });
+          }}
+          data-testid="arch-check-impact-btn"
+        >
+          <GitBranch size={13} aria-hidden="true" />
+          <span>Check Change Impact</span>
         </button>
 
         {isLoading ? (

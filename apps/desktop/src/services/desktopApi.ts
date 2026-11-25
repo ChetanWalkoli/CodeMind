@@ -87,6 +87,13 @@ import {
   type IntentGetRequest,
   type IntentInvestigateRequest,
   type IntentListRequest,
+  type ActivityClearRequest,
+  type ActivityEvent,
+  type ActivityListRequest,
+  type AppPreferences,
+  type AppPreferencesPatch,
+  type DiagnosticsGetRequest,
+  type DiagnosticsSnapshot,
   type ImpactAnalysisRequest,
   type ImpactAnalysisResult,
   type ImpactAnalysisSummary,
@@ -1380,5 +1387,66 @@ export const desktopApi = {
     const bridge = getBridge();
     if (!bridge) return { ok: true, data: { deleted: false } };
     return safeInvoke(() => bridge.deleteImpactAnalysis(request), "BRIDGE_IMPACT_DELETE_FAILED");
+  },
+
+  async listActivityEvents(request: ActivityListRequest): Promise<IpcResponse<ActivityEvent[]>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: [] };
+    return safeInvoke(() => bridge.listActivityEvents(request), "BRIDGE_ACTIVITY_LIST_FAILED");
+  },
+
+  async clearActivityEvents(
+    request: ActivityClearRequest
+  ): Promise<IpcResponse<{ cleared: boolean }>> {
+    const bridge = getBridge();
+    if (!bridge) return { ok: true, data: { cleared: false } };
+    return safeInvoke(() => bridge.clearActivityEvents(request), "BRIDGE_ACTIVITY_CLEAR_FAILED");
+  },
+
+  async getAppPreferences(): Promise<IpcResponse<AppPreferences>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          schemaVersion: 1,
+          editorFontSize: 13,
+          reopenLastWorkspace: true,
+          onboardingCompleted: true,
+          confirmBeforePatchApply: true,
+          confirmBeforeCommandRun: true
+        }
+      };
+    }
+    return safeInvoke(() => bridge.getAppPreferences(), "BRIDGE_PREFERENCES_GET_FAILED");
+  },
+
+  async updateAppPreferences(patch: AppPreferencesPatch): Promise<IpcResponse<AppPreferences>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: true,
+        data: {
+          schemaVersion: 1,
+          editorFontSize: patch.editorFontSize ?? 13,
+          reopenLastWorkspace: patch.reopenLastWorkspace ?? true,
+          onboardingCompleted: patch.onboardingCompleted ?? true,
+          confirmBeforePatchApply: true,
+          confirmBeforeCommandRun: true
+        }
+      };
+    }
+    return safeInvoke(() => bridge.updateAppPreferences(patch), "BRIDGE_PREFERENCES_UPDATE_FAILED");
+  },
+
+  async getDiagnostics(request?: DiagnosticsGetRequest): Promise<IpcResponse<DiagnosticsSnapshot>> {
+    const bridge = getBridge();
+    if (!bridge) {
+      return {
+        ok: false,
+        error: { code: "ELECTRON_REQUIRED", message: "Diagnostics require the desktop app." }
+      };
+    }
+    return safeInvoke(() => bridge.getDiagnostics(request), "BRIDGE_DIAGNOSTICS_GET_FAILED");
   }
 };

@@ -11,7 +11,9 @@ import {
   Terminal,
   X
 } from "lucide-react";
-import type { PatchApprovalEntry } from "@codemind/shared";
+import type { ImpactAnalysisResult, PatchApprovalEntry } from "@codemind/shared";
+import { desktopApi } from "../../services/desktopApi";
+import { navigateToImpactRecord } from "../../services/evidenceNavigation";
 import { useDecisionStore } from "../../stores/decision.store";
 import { useIntentStore, type IntentWorkspaceTab } from "../../stores/intent.store";
 import { useWorkspaceStore } from "../../stores/workspace.store";
@@ -64,6 +66,8 @@ export function IntentWorkspace() {
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
   const [latestApprovalId, setLatestApprovalId] = useState<string | null>(null);
   const [forceOverwrite, setForceOverwrite] = useState(false);
+  const [preApplyImpact, setPreApplyImpact] = useState<ImpactAnalysisResult | null>(null);
+  const [checkingImpact, setCheckingImpact] = useState(false);
 
   if (!workspace || !session) {
     return (
@@ -486,6 +490,65 @@ export function IntentWorkspace() {
                     <span className={styles.muted}>orig {p.originalFileHash.slice(0, 10)}</span>
                   </div>
                 ))}
+                <div className={styles.card} data-testid="intent-pre-apply-impact">
+                  <div className={styles.cardHeader}>
+                    <strong>Pre-Apply Change Impact Check (Optional)</strong>
+                    <button
+                      type="button"
+                      className={styles.secondaryBtn}
+                      disabled={busy || checkingImpact}
+                      onClick={async () => {
+                        setCheckingImpact(true);
+                        try {
+                          const res = await desktopApi.analyzeChangeImpact({
+                            workspaceRoot: root,
+                            targets: acceptedPatches.map((p) => ({
+                              filePath: p.targetFile,
+                              beforeContent: p.originalContent,
+                              afterContent: p.proposedContent
+                            })),
+                            changeType: "file_modified",
+                            maxDepth: 3,
+                            maxAffectedFiles: 50
+                          });
+                          if (res.ok) {
+                            setPreApplyImpact(res.data);
+                          }
+                        } finally {
+                          setCheckingImpact(false);
+                        }
+                      }}
+                    >
+                      {checkingImpact ? "Checking Impact..." : "Check Change Impact"}
+                    </button>
+                  </div>
+                  {preApplyImpact ? (
+                    <div className={styles.rowActions}>
+                      <span className={styles.badge}>
+                        {preApplyImpact.risk.level.toUpperCase()} RISK ({preApplyImpact.risk.score}
+                        /100)
+                      </span>
+                      <span className={styles.muted}>
+                        {preApplyImpact.impactedFiles.length} impacted files ·{" "}
+                        {preApplyImpact.impactedTests.length} tests ·{" "}
+                        {preApplyImpact.relatedDecisions.length} decisions
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={() => void navigateToImpactRecord(root, preApplyImpact.analysisId)}
+                      >
+                        Open Full Impact Report
+                      </button>
+                    </div>
+                  ) : (
+                    <p className={styles.muted}>
+                      Change Impact has not been checked for these patches yet. You may run a
+                      pre-apply impact check above or proceed with explicit approval.
+                    </p>
+                  )}
+                </div>
+
                 <div className={styles.rowActions}>
                   <button
                     type="button"
